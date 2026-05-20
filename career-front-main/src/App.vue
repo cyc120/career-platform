@@ -52,24 +52,22 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { userData } from '@/mock/data.js' // ✅ 正确导入
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-const isLoggedIn = ref(true)
+const auth = useAuthStore()
 
-// 使用导入的 userData，不要重复声明
-const user = computed(() => isLoggedIn.value ? userData : null)
+const isLoggedIn = computed(() => auth.isLoggedIn)
+const userData = computed(() => auth.user || { name: '用户' })
 
-// 登录处理
 const handleLogin = () => {
   router.push('/profile/info')
 }
 
-// 退出处理
-const handleLogout = () => {
-  isLoggedIn.value = false
+const handleLogout = async () => {
+  await auth.logout()
   router.push('/')
 }
 </script>

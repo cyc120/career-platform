@@ -49,39 +49,50 @@
 </template>
 
 <script setup>
-import { ref,onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import rawData from '@/assets/data.json'
+import { favoritesApi } from '@/api/favorites'
 
 const router = useRouter()
-
 const favoriteList = ref([])
 
-onMounted(() => {
-  // 1. 获取收藏的 ID 列表
-  const favoriteIds = JSON.parse(localStorage.getItem('user_favorites') || '[]')
-  
-  // 2. 从 data.json 中筛选出这些岗位，并进行字段映射（确保和列表页一致）
-  favoriteList.value = rawData
-    .map((item, index) => ({
-      ...item,
-      id: item.id || index + 1,
-      title: item.job_title,
-      company: item.company_name,
-      salary: item.min_salary ? `${item.min_salary/1000}k-${item.max_salary/1000}k` : '面议',
-      city: item.city || '杭州',
-      experience: item.experience || '经验不限',
-      tags: item.industry ? item.industry.split(',').slice(0, 2) : ['互联网']
+const loadFavorites = async () => {
+  try {
+    const { data } = await favoritesApi.list()
+    favoriteList.value = (data.favorites || []).map((f) => ({
+      id: f.job_id,
+      title: f.job_title,
+      company: f.company,
+      salary: f.salary_range || '面议',
+      city: f.city || '--',
+      experience: f.experience || '--',
+      industry: f.industry || '',
+      tags: f.industry ? f.industry.split(',').slice(0, 2) : [],
     }))
-    .filter(job => favoriteIds.includes(job.id)) // 只保留已收藏的
+  } catch {
+    favoriteList.value = []
+  }
+}
+
+onMounted(() => {
+  loadFavorites()
 })
 
 const goToExplore = () => {
-  router.push('/job-explorer')
+  router.push('/jobs')
 }
 
 const goToDetail = (id) => {
   router.push({ name: 'JobDetail', params: { id } })
+}
+
+const removeFavorite = async (jobId) => {
+  try {
+    await favoritesApi.remove(jobId)
+    favoriteList.value = favoriteList.value.filter((j) => j.id !== jobId)
+  } catch {
+    // ignore
+  }
 }
 </script>
 

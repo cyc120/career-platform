@@ -160,7 +160,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, reactive } from 'vue'
-import { MagicStick, TrendCharts, Compass, Checked, Promotion, Close } from '@element-plus/icons-vue' // 🌟 新增 Promotion, Close 图标引用
+import { MagicStick, TrendCharts, Compass, Checked, Promotion, Close } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 
 // --- 拖拽核心逻辑 ---

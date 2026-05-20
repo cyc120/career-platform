@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from fastapi import APIRouter, Depends, UploadFile, File, Form
@@ -75,5 +76,3 @@ async def analyze_resume(
     )
     return result
 
-
-import json

@@ -83,16 +83,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted,nextTick, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Star, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import rawData from '@/assets/data.json'
+import { jobsApi } from '@/api/jobs'
+import { favoritesApi } from '@/api/favorites'
 import ForceGraph from 'force-graph'
 import neo4j from 'neo4j-driver'
 import * as d3 from 'd3';
 import * as G6 from '@antv/g6';
-import promotionData from '@/mock/promotionData.json'; // 确保你已创建此文件
 import PromotionGraph from '@/components/PromotionGraph.vue'
 // --- 1. 引用和状态 ---
 const graphContainer = ref(null)
@@ -307,79 +307,47 @@ ctx.fillStyle = node.level === 1 ? '#ffffff' : '#001f3f';
   }
 };
 
-// 在页面挂载后启动
-onMounted(async () => {
-  await nextTick()
-  initGraph()
-  initPromotionGraph(); // 新增的 Mock 数据初始化
-})
-
-// 加载状态
 const loading = ref(true)
-
-// 当前职位数据
 const job = ref(null)
-
-// 监听岗位切换
-watch(() => job.value, () => {
-  nextTick(() => initPromotionGraph());
-}, { deep: true });
-
-const resetView = () => graphInstance.zoomToFit(400)
-
-onMounted(async () => {
-  loading.value = true
-  await new Promise(resolve => setTimeout(resolve, 300))
-
-  const targetId = parseInt(route.params.id)
-  // 从导入的 rawData 中寻找
-  const foundItem = rawData.find((item, index) => (item.id || index + 1) === targetId)
-
-  if (foundItem) {
-    job.value = {
-      id: targetId,
-      title: foundItem.job_title,      // 对应 JSON 的 job_title
-      company: foundItem.company_name, // 对应 JSON 的 company_name
-      // 薪资计算处理
-      salary: foundItem.min_salary ? `${foundItem.min_salary/1000}k-${foundItem.max_salary/1000}k` : '面议',
-      city: foundItem.location || '杭州', // 💡 修正：JSON 字段是 location
-      description: foundItem.job_details, // 💡 修正：JSON 字段是 job_details
-    }
-    isFavorited.value = favorites.value.includes(targetId)
-    
-    // 确保数据加载后再初始化图谱
-    nextTick(() => {
-      initGraph()
-    })
-  }
-  loading.value = false
-})
-
 const router = useRouter()
 const route = useRoute()
-
-
-// 是否已收藏
 const isFavorited = ref(false)
-
-// 模拟用户收藏列表（实际项目中应使用 Pinia 或 localStorage）
-const favorites = ref(JSON.parse(localStorage.getItem('user_favorites') || '[]'))
-// 获取职位 ID
 const jobId = computed(() => route.params.id)
 
-// 加载职位数据
+// 在页面挂载后启动
 onMounted(async () => {
-  // 模拟加载延迟
-  await new Promise(resolve => setTimeout(resolve, 500))
+  // Load job from API
+  const targetId = parseInt(route.params.id)
+  try {
+    const { data } = await jobsApi.detail(targetId)
+    if (data.job) {
+      const item = data.job
+      job.value = {
+        id: item.id,
+        title: item.job_title || item.title,
+        company: item.company_name || item.company,
+        salary: item.salary_range || item.salary || '面议',
+        city: item.city || item.location || '--',
+        description: item.job_description || item.description || '暂无描述',
+      }
+    }
+  } catch {
+    // Job not found — keep null
+  }
 
-  const foundJob = allJobs.find(j => j.id === parseInt(jobId.value))
-  job.value = foundJob
+  // Check favorite status
+  try {
+    const { data: favData } = await favoritesApi.list()
+    const favIds = (favData.favorites || []).map((f) => f.job_id)
+    isFavorited.value = favIds.includes(targetId)
+  } catch {
+    // ignore
+  }
+
   loading.value = false
 
-  // 判断是否已收藏
-  if (foundJob && favorites.value.includes(foundJob.id)) {
-    isFavorited.value = true
-  }
+  await nextTick()
+  initGraph()
 })
 
 // 返回上一页
@@ -390,25 +358,21 @@ const goBack = () => {
 
 
 // 2. 修改点击收藏的逻辑
-const toggleFavorite = () => {
-  if (job.value) {
-    const id = parseInt(jobId.value)
-    const index = favorites.value.indexOf(id)
-    
-    if (index > -1) {
-      // 如果已收藏，则移除
-      favorites.value.splice(index, 1)
+const toggleFavorite = async () => {
+  if (!job.value) return
+  const id = parseInt(jobId.value)
+  try {
+    if (isFavorited.value) {
+      await favoritesApi.remove(id)
       isFavorited.value = false
       ElMessage.success('已取消收藏')
     } else {
-      // 如果未收藏，则添加
-      favorites.value.push(id)
+      await favoritesApi.add(id)
       isFavorited.value = true
-      ElMessage.success('已收藏')
+      ElMessage.success('已添加收藏')
     }
-    
-    // 🌟 关键：同步到本地存储
-    localStorage.setItem('user_favorites', JSON.stringify(favorites.value))
+  } catch {
+    ElMessage.error('操作失败')
   }
 }
 

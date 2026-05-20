@@ -127,11 +127,10 @@
 </template>
 
 <script setup>
-import { ref, computed , onMounted} from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, ArrowDown, Pointer, Loading } from '@element-plus/icons-vue'
-import rawData from '@/assets/data.json'
-
+import { jobsApi } from '@/api/jobs'
 
 const router = useRouter()
 const searchQuery = ref('')
@@ -142,32 +141,32 @@ const selectedTags = ref([])
 const hoveredJob = ref(null)
 const allJobs = ref([])
 
+const loadJobs = async () => {
+  try {
+    const params = {}
+    if (searchQuery.value) params.q = searchQuery.value
+    selectedTags.value.forEach((tag) => {
+      params[tag.type] = tag.value
+    })
+    const { data } = await jobsApi.search(searchQuery.value || '', params)
+    allJobs.value = (data.jobs || []).map((item, index) => ({
+      ...item,
+      id: item.id || index + 1,
+      title: item.job_title || item.title,
+      company: item.company_name || item.company,
+      salary: item.salary_range || item.salary || '面议',
+      scale: item.company_scale || '--',
+      city: item.city || '--',
+      tags: item.industry ? item.industry.split(',').slice(0, 2) : [],
+      description: item.job_description || item.description,
+    }))
+  } catch {
+    allJobs.value = []
+  }
+}
+
 onMounted(() => {
-  // 核心：这里的左侧 Key 必须和 <template> 里的 job.xxx 对应
-  allJobs.value = rawData.map((item, index) => ({
-    ...item,
-    id: item.id || index + 1,
-    
-    // 对应模板中的 {{ job.title }}
-    title: item.job_title,      
-    
-    // 对应模板中的 {{ job.company }}
-    company: item.company_name, 
-    
-    // 对应模板中的 {{ job.salary }}
-    salary: item.min_salary ? `${item.min_salary/1000}k-${item.max_salary/1000}k` : '面议',
-    
-    // 对应模板中的 {{ job.scale }}
-    scale: item.company_scale || '大厂',
-    
-    // 对应模板中的 v-for="tag in job.tags" (JSON里是逗号分隔的字符串，需要转成数组)
-    tags: item.industry ? item.industry.split(',').slice(0, 2) : ['互联网'],
-    
-    // 对应右侧预览面板需要的字段
-    description: item.job_details,
-    city: item.city || '杭州',
-    matchRate: 92 
-  }))
+  loadJobs()
 })
 
 // --- 🌟 无限滚动逻辑控制 ---
@@ -209,7 +208,8 @@ const loadMore = () => {
 }
 
 const handleSearch = () => {
-  count.value = 6 // 搜索时重置加载数量
+  count.value = 6
+  loadJobs()
 }
 
 // --- 其他功能函数 ---

@@ -387,7 +387,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Search,
@@ -402,10 +402,42 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { hotJobs, userData } from '@/mock/data.js'
+import { jobsApi } from '@/api/jobs'
+import { useAuthStore } from '@/stores/auth'
 import JobCard from '@/components/JobCard.vue'
 import gsap from 'gsap'
 import { UserFilled } from '@element-plus/icons-vue'; // 确保引入图标
+
+const auth = useAuthStore()
+const hotJobs = ref([])
+
+const loadHotJobs = async () => {
+  try {
+    const { data } = await jobsApi.list({ page_size: 10 })
+    hotJobs.value = (data.jobs || []).map((item) => ({
+      id: item.id,
+      jobTitle: item.job_title || item.title,
+      companyName: item.company_name || item.company,
+      location: item.city || '--',
+      matchRate: item.match_rate || 85,
+      salary: item.salary_range || item.salary || '面议',
+      tags: item.industry ? item.industry.split(',').slice(0, 3) : [],
+      raw: { industry: item.industry || '' },
+    }))
+  } catch {
+    // keep empty
+  }
+}
+
+const userData = computed(() => auth.user || { name: 'user', skills: userDataFallback.skills })
+
+const userDataFallback = {
+  name: 'user',
+  skills: {
+    certificate: 70, digital: 75, teamwork: 80, learning: 90,
+    professional: 85, internship: 65, communication: 80, pressure: 75, innovation: 85,
+  },
+}
 
 const showProfileGuide = ref(false); // 控制浮层显示
 
@@ -872,7 +904,7 @@ const goToProfile = () => router.push('/profile/info')
 
 // 生命周期
 onMounted(() => {
-  startTyping()
+  loadHotJobs()
   window.addEventListener('resize', handleResize)
 })
 
