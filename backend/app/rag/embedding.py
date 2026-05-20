@@ -4,14 +4,22 @@ from app.config import settings
 
 
 @lru_cache(maxsize=1)
-def get_embeddings() -> OpenAIEmbeddings:
-    """Returns a cached OpenAI-compatible embeddings instance.
+def get_embeddings():
+    """Returns a cached embeddings instance.
 
-    Uses DeepSeek's OpenAI-compatible API for embeddings.
-    Falls back to local BGE model if DeepSeek embedding is unavailable.
+    If OPENAI_EMBEDDING_MODEL looks like a HuggingFace model (contains '/'),
+    uses local BGE embeddings. Otherwise uses OpenAI-compatible API.
     """
+    model = settings.OPENAI_EMBEDDING_MODEL
+    if "/" in model:
+        from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+        return HuggingFaceBgeEmbeddings(
+            model_name=model,
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True},
+        )
     return OpenAIEmbeddings(
-        model=settings.OPENAI_EMBEDDING_MODEL,
+        model=model,
         api_key=settings.OPENAI_API_KEY,
         base_url=settings.OPENAI_BASE_URL,
     )
