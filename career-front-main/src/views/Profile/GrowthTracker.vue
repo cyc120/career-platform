@@ -10,10 +10,10 @@
           <p class="message-text">{{ aiAnalysis }}</p>
         </div>
       </div>
-      <div class="quick-stats">
+      <div class="quick-stats" v-if="growthRate !== '--' || consecutiveDays > 0">
         <div class="stat-item">
           <span class="label">成长速度</span>
-          <span class="value">+12%</span>
+          <span class="value">{{ growthRate }}</span>
         </div>
         <el-divider direction="vertical" />
         <div class="stat-item">
@@ -49,12 +49,12 @@
               <span><el-icon><Compass /></el-icon> 职业路径步骤</span>
             </div>
           </template>
-          <div class="path-steps">
-            <el-steps direction="vertical" :active="2" finish-status="success">
-              <el-step title="基础稳固" description="简历匹配度已达标" />
-              <el-step title="技能突破" description="Agent 建议：强化 ECharts 实战项目" />
-              <el-step title="模拟面试" description="待解锁：AI 模拟压力面试" />
-              <el-step title="目标达成" :description="'锁定 ' + targetPosition" />
+          <div class="path-steps" v-loading="pathSteps.length === 0">
+            <el-empty v-if="pathSteps.length === 0" description="加载职业路径中..." :image-size="60" />
+            <el-steps v-else direction="vertical" :active="currentPhaseIndex" finish-status="success">
+              <el-step v-for="(step, idx) in pathSteps" :key="idx"
+                :title="step.phase_name || step.title"
+                :description="step.goals ? step.goals.slice(0, 2).join('；') : step.description || ''" />
             </el-steps>
           </div>
         </el-card>
@@ -65,7 +65,7 @@
   <template #header>
     <div class="card-header">
       <span><el-icon><Checked /></el-icon> 代理人分配任务</span>
-      <span class="todo-subtitle">完成任务可提升 {{ targetPosition }} 匹配度</span>
+      <span class="todo-subtitle" v-if="targetPosition">完成任务可提升 {{ targetPosition }} 匹配度</span>
     </div>
   </template>
 
@@ -119,32 +119,43 @@
         </template>
         
 <div class="dialog-body-content">
-  <div class="chat-messages">
-    <div class="bot-msg-wrapper">
+  <div class="chat-messages" ref="chatMessagesRef">
+    <!-- 对话历史（含 AI 初始问候） -->
+    <div v-for="(msg, idx) in chatHistory" :key="idx" :class="msg.role === 'user' ? 'user-msg-wrapper' : 'bot-msg-wrapper'">
+      <div v-if="msg.role === 'assistant'" class="bot-avatar-mini"><el-icon><MagicStick /></el-icon></div>
+      <div :class="msg.role === 'user' ? 'user-content' : 'bot-content'">
+        <span class="bot-info" v-if="msg.role === 'assistant'">Career Pilot</span>
+        <span class="bot-info" v-else>我</span>
+        <div :class="msg.role === 'user' ? 'user-prompt' : 'bot-prompt'">{{ msg.content }}</div>
+      </div>
+    </div>
+    <!-- 加载指示器 -->
+    <div v-if="isCoachingLoading" class="bot-msg-wrapper">
       <div class="bot-avatar-mini"><el-icon><MagicStick /></el-icon></div>
       <div class="bot-content">
-        <span class="bot-info">职能助手</span>
-        <div class="bot-prompt">
-          {{ aiAnalysis }}
+        <span class="bot-info">Career Pilot</span>
+        <div class="bot-prompt typing-indicator">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
         </div>
       </div>
     </div>
   </div>
-  
+
   <div class="input-area">
     <div class="input-container">
       <el-input
         v-model="coachInputValue"
         type="textarea"
-        :autosize="{ minRows: 2, maxRows: 4 }"
-        placeholder="在此粘贴简历内容..."
+        :autosize="{ minRows: 1, maxRows: 4 }"
+        placeholder="输入你的职业困惑，或粘贴简历内容..."
         resize="none"
+        @keydown.enter.exact.prevent="sendCoachMessage"
       />
       <div class="input-footer">
-        <el-button 
-          type="primary" 
-          class="send-icon-btn" 
-          @click="sendCoachMessage" 
+        <el-button
+          type="primary"
+          class="send-icon-btn"
+          @click="sendCoachMessage"
           :loading="isCoachingLoading"
         >
           <el-icon><Promotion /></el-icon>
@@ -159,10 +170,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, reactive } from 'vue'
-import { MagicStick, TrendCharts, Compass, Checked, Promotion, Close } from '@element-plus/icons-vue'
+import { ref, onMounted, onUnmounted, nextTick, reactive, watch } from 'vue'
+import { MagicStick, TrendCharts, Compass, Checked, Promotion, Close, Timer, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
+import { learningPlanApi } from '@/api/learningPlan'
 
 // --- 拖拽核心逻辑 ---
 const isDragging = ref(false)
@@ -215,35 +227,127 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', handleMouseUp)
 })
 
-// 🌟 原有响应式数据和逻辑均保留
-const aiAnalysis = ref('正在分析中...')
-const targetPosition = ref('Java')
-const consecutiveDays = ref(12)
+// --- 响应式数据和逻辑 ---
+const aiAnalysis = ref('')
+const targetPosition = ref('')
+const consecutiveDays = ref(0)
+const growthRate = ref('--')
+const currentPhaseIndex = ref(0)
+const pathSteps = ref([])
 const radarChartRef = ref(null)
 let radarInstance = null
 
-const todoList = ref([
-  { id: 1, text: 'Java并发编程基础回顾与JUC包入门', completed: false, isAI: true },
-  { id: 2, text: '深入线程池原理与并发容器', completed: false, isAI: true },
-  { id: 3, text: '锁优化与AQS框架解析', completed: false, isAI: true },
-  { id: 4, text: 'JVM内存模型与垃圾回收基础', completed: false, isAI: true },
-  { id: 5, text: '垃圾回收器与内存分配策略', completed: false, isAI: true }
+const currentLevelData = ref([85, 70, 75, 90, 80])
+const targetLevelData = ref([95, 90, 85, 95, 90])
+const radarIndicators = ref([
+  { name: '技术广度', max: 100 }, { name: '业务理解', max: 100 },
+  { name: '沟通能力', max: 100 }, { name: '工程化', max: 100 },
+  { name: '解决问题', max: 100 }
 ])
 
-// 🌟 初始化雷达图逻辑保留
+const todoList = ref([])
+
+// 调用 learning_plan agent
+const fetchLearningPlan = async () => {
+  try {
+    const { data } = await learningPlanApi.generate({ plan_type: '长期' })
+    if (data.learning_plan) {
+      const plan = data.learning_plan
+      if (plan.target_job) targetPosition.value = plan.target_job
+      // 构建 AI 分析摘要
+      const parts = []
+      if (plan.total_duration) parts.push(`预计总时长：${plan.total_duration}`)
+      if (plan.estimated_difficulty) parts.push(`难度等级：${plan.estimated_difficulty}`)
+      const phaseCount = (plan.phases || []).length
+      if (phaseCount > 0) {
+        parts.push(`共 ${phaseCount} 个学习阶段`)
+        if (plan.total_duration) {
+          parts.push('我已为你拆解了职业路径步骤，点击右侧查看详情')
+        }
+      }
+      aiAnalysis.value = parts.join('；') || '学习计划已生成，请查看下方详情'
+
+      // 路径步骤
+      if (plan.phases && plan.phases.length > 0) {
+        pathSteps.value = plan.phases.map((p) => ({
+          phase_name: p.phase_name || p.title || '',
+          goals: p.goals || [],
+          content: p.content || [],
+          duration: p.duration || '',
+          description: p.goals ? p.goals.slice(0, 2).join('；') : '',
+        }))
+        currentPhaseIndex.value = 0 // 当前激活第一个阶段
+      }
+
+      // 成长速度 / 打卡天数（估算值）
+      if (phaseCount > 0 && plan.total_duration) {
+        growthRate.value = `+${Math.min(phaseCount * 5, 50)}%`
+      }
+
+      // 能力雷达
+      if (plan.current_level) {
+        const vals = Object.values(plan.current_level)
+        if (vals.length > 0) currentLevelData.value = vals
+      }
+      if (plan.target_level) {
+        const vals = Object.values(plan.target_level)
+        if (vals.length > 0) targetLevelData.value = vals
+      }
+      if (plan.dimensions) {
+        radarIndicators.value = plan.dimensions.map((d) => ({ name: d, max: 100 }))
+      }
+    }
+  } catch {
+    ElMessage.warning('获取学习规划失败')
+  }
+}
+
+const fetchDailyTasks = async () => {
+  try {
+    const { data } = await learningPlanApi.dailyTasks({ phase_index: 0 })
+    if (data.daily_tasks) {
+      todoList.value = data.daily_tasks.map((t, i) => ({
+        id: t.id || i + 1,
+        text: t.content || t.title || t.task,
+        desc: t.description || t.desc || '',
+        time: t.estimated_time || t.time || 30,
+        difficulty: t.difficulty || '中等',
+        completed: false,
+        isAI: true,
+      }))
+    } else if (data.learning_plan?.phases) {
+      // 从 learning_plan phases 提取任务
+      const tasks = []
+      data.learning_plan.phases.forEach((phase, pi) => {
+        (phase.tasks || []).forEach((t, ti) => {
+          tasks.push({
+            id: tasks.length + 1,
+            text: t.content || t.title || t.task,
+            desc: t.description || t.desc || phase.name || '',
+            time: t.estimated_time || 30,
+            difficulty: t.difficulty || '中等',
+            completed: false,
+            isAI: true,
+          })
+        })
+      })
+      if (tasks.length > 0) todoList.value = tasks
+    }
+  } catch {
+    // 从 generate 的返回中获取任务
+  }
+}
+
+// 雷达图初始化
 const initRadarChart = () => {
   if (!radarChartRef.value) return
   if (radarInstance) radarInstance.dispose()
-  
+
   radarInstance = echarts.init(radarChartRef.value)
   const option = {
     color: ['#70a1ff', '#e2e8f0'],
     radar: {
-      indicator: [
-        { name: '技术广度', max: 100 }, { name: '业务理解', max: 100 },
-        { name: '沟通能力', max: 100 }, { name: '工程化', max: 100 },
-        { name: '解决问题', max: 100 }
-      ],
+      indicator: radarIndicators.value,
       splitArea: { show: false },
       axisLine: { lineStyle: { color: 'rgba(112, 161, 255, 0.2)' } },
       splitLine: { lineStyle: { color: 'rgba(112, 161, 255, 0.1)' } }
@@ -252,13 +356,13 @@ const initRadarChart = () => {
       type: 'radar',
       data: [
         {
-          value: [85, 70, 75, 90, 80],
+          value: currentLevelData.value,
           name: '当前水平',
           areaStyle: { color: 'rgba(112, 161, 255, 0.2)' },
           lineStyle: { color: '#70a1ff', width: 2 }
         },
         {
-          value: [95, 90, 85, 95, 90],
+          value: targetLevelData.value,
           name: '目标要求',
           lineStyle: { type: 'dashed', color: '#94a3b8', width: 1 },
           symbol: 'none'
@@ -271,11 +375,9 @@ const initRadarChart = () => {
 
 const handleResize = () => radarInstance?.resize()
 
-// 🌟 原有生命周期逻辑保留
+// 生命周期
 onMounted(async () => {
-  setTimeout(() => {
-    aiAnalysis.value = "检测到你近期在 Vue3 调试上花费了较多时间，已自动为你匹配了相关的性能优化任务。"
-  }, 1000)
+  await Promise.all([fetchLearningPlan(), fetchDailyTasks()])
 
   await nextTick()
   setTimeout(() => {
@@ -289,27 +391,81 @@ onUnmounted(() => {
   radarInstance?.dispose()
 })
 
-// 🌟 新增交互逻辑
-const isCoachingOpen = ref(false); // 对话框开关
-const coachInputValue = ref(''); // 输入框内容
-const isCoachingLoading = ref(false); // 提交状态
+// --- 智能辅导对话框 ---
+const isCoachingOpen = ref(false)
+const coachInputValue = ref('')
+const isCoachingLoading = ref(false)
+const chatHistory = ref([]) // [{role: "user"|"assistant", content: str}]
+const chatMessagesRef = ref(null)
+const coachGreeted = ref(false)
 
 const toggleCoaching = () => {
-  isCoachingOpen.value = !isCoachingOpen.value;
+  isCoachingOpen.value = !isCoachingOpen.value
 }
 
-const sendCoachMessage = () => {
-  if (!coachInputValue.value.trim()) return;
-  
-  isCoachingLoading.value = true;
-  // 模拟发送和 Agent 思考中
-  setTimeout(() => {
-    ElMessage.success({ message: '提交成功！Agent 正在评估你的需求...', offset: 100 });
-    coachInputValue.value = '';
-    isCoachingLoading.value = false;
-    isCoachingOpen.value = false;
-  }, 1500)
+const scrollChatToBottom = () => {
+  nextTick(() => {
+    const el = chatMessagesRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
 }
+
+// AI 生成初始问候
+const initCoachGreeting = async () => {
+  if (coachGreeted.value) return
+  coachGreeted.value = true
+  isCoachingLoading.value = true
+  try {
+    console.log('[GrowthCoach] Sending greeting...')
+    const resp = await learningPlanApi.coach('你好，请简单介绍一下你自己，并告诉我你能如何帮助我进行职业规划。', [])
+    console.log('[GrowthCoach] Response:', resp.status, resp.data)
+    const reply = resp.data?.reply
+    if (reply) {
+      chatHistory.value.push({ role: 'assistant', content: reply })
+    } else {
+      console.warn('[GrowthCoach] No reply in response:', resp.data)
+    }
+  } catch (err) {
+    console.error('[GrowthCoach] Greeting failed:', err)
+  } finally {
+    isCoachingLoading.value = false
+  }
+}
+
+const sendCoachMessage = async () => {
+  const text = coachInputValue.value.trim()
+  if (!text) return
+
+  chatHistory.value.push({ role: 'user', content: text })
+  coachInputValue.value = ''
+  isCoachingLoading.value = true
+  scrollChatToBottom()
+
+  try {
+    console.log('[GrowthCoach] Sending message:', text)
+    const resp = await learningPlanApi.coach(
+      text,
+      chatHistory.value.slice(0, -1)
+    )
+    console.log('[GrowthCoach] Response:', resp.status, resp.data)
+    const reply = resp.data?.reply
+    chatHistory.value.push({ role: 'assistant', content: reply || '抱歉，暂时无法回复。' })
+  } catch (err) {
+    console.error('[GrowthCoach] Send failed:', err)
+    chatHistory.value.push({ role: 'assistant', content: '抱歉，AI 服务暂时不可用，请稍后再试。' })
+  } finally {
+    isCoachingLoading.value = false
+    scrollChatToBottom()
+  }
+}
+
+// 打开对话框时自动触发 AI 问候
+watch(isCoachingOpen, (open) => {
+  if (open) {
+    coachInputValue.value = ''
+    initCoachGreeting()
+  }
+})
 </script>
 
 <style scoped lang="scss">
@@ -538,6 +694,7 @@ const sendCoachMessage = () => {
         .bot-msg-wrapper {
           display: flex;
           gap: 12px;
+          align-items: flex-start;
           
           .bot-avatar-mini {
             width: 32px;
@@ -553,17 +710,60 @@ const sendCoachMessage = () => {
 
           .bot-content {
             .bot-info { font-size: 12px; color: #94a3b8; margin-bottom: 4px; display: block; }
-            .bot-prompt { 
-              background: white; 
-              padding: 12px 16px; 
-              border-radius: 4px 16px 16px 16px; 
-              color: #334155; 
+            .bot-prompt {
+              background: white;
+              padding: 12px 16px;
+              border-radius: 4px 16px 16px 16px;
+              color: #334155;
               font-size: 14px;
               line-height: 1.5;
               box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
               border: 1px solid #f1f5f9;
             }
           }
+        }
+
+        // 用户消息样式
+        .user-msg-wrapper {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 12px;
+
+          .user-content {
+            max-width: 85%;
+            .bot-info { font-size: 11px; color: #94a3b8; margin-bottom: 4px; display: block; text-align: right; }
+            .user-prompt {
+              background: linear-gradient(135deg, #70a1ff 0%, #4a8cff 100%);
+              color: #ffffff;
+              padding: 12px 16px;
+              border-radius: 16px 4px 16px 16px;
+              font-size: 14px;
+              line-height: 1.5;
+              box-shadow: 0 2px 12px rgba(112, 161, 255, 0.2);
+            }
+          }
+        }
+
+        // 打字指示器
+        .typing-indicator {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 14px 20px !important;
+          .dot {
+            width: 7px;
+            height: 7px;
+            background: #94a3b8;
+            border-radius: 50%;
+            animation: typingBounce 1.4s ease-in-out infinite;
+            &:nth-child(2) { animation-delay: 0.2s; }
+            &:nth-child(3) { animation-delay: 0.4s; }
+          }
+        }
+
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-6px); opacity: 1; }
         }
       }
 

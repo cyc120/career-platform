@@ -83,7 +83,7 @@
                 </span>
                 <span class="time">{{ item.time }}</span>
               </div>
-              <p class="history-note">“{{ item.note }}”</p>
+              <p class="history-note">"{{ item.note }}"</p>
               <div class="hover-mask">
                 <el-icon><RefreshLeft /></el-icon> 切换到此版本
               </div>
@@ -108,58 +108,51 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue' // 添加 onMounted
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
-import { 
-  MagicStick, EditPen, Download, Promotion, 
-  Checked, Clock, InfoFilled, RefreshLeft, QuestionFilled 
+import {
+  MagicStick, EditPen, Download, Promotion,
+  Checked, Clock, InfoFilled, RefreshLeft, QuestionFilled
 } from '@element-plus/icons-vue'
-import html2pdf from 'html2pdf.js';
+import html2pdf from 'html2pdf.js'
+import { learningPlanApi } from '@/api/learningPlan'
 
 const props = defineProps({
   reportData: {
     type: Object,
     default: () => ({
-      reportTitle: '2026 前端开发工程师成长规划报告',
-initialContent: `职业进阶学习计划：Java 高级架构师之路
-
-第一阶段：Java 核心深化与架构基础 (2-3个月)
-核心目标：深化 JVM 与并发编程，掌握微服务分布式核心体系。
-- 学习重点：JUC 并发工具包、JVM 垃圾回收调优、Spring Cloud Alibaba (Nacos/Sentinel)、消息中间件原理 (Kafka)。
-- 推荐资源：《深入理解Java虚拟机》、极客时间《Java并发编程实战》。
-
-第二阶段：性能调优与云原生技术栈 (2-3个月)
-核心目标：掌握大规模系统调优，熟练运用 K8s 进行容器化运维。
-- 学习重点：MySQL 索引与 SQL 调优、Redis 集群方案、Kubernetes 编排、Prometheus 可观测性监控。
-- 推荐资源：《高性能MySQL》、腾讯云/阿里云 K8s 实战练习。
-
-第三阶段：领域驱动设计 (DDD) 与架构演进 (1-2个月)
-核心目标：掌握复杂业务建模方法，建立整洁架构思维。
-- 学习重点：限界上下文划分、聚合根设计、六边形架构、代码重构与设计模式深度应用。
-- 推荐资源：《领域驱动设计：软件核心复杂性应对之道》、Martin Fowler 博客。
-
-第四阶段：综合实战与软技能提升 (持续进行)
-核心目标：提升技术方案评审、团队协作及全栈项目主导能力后。
-- 学习重点：编写高质量技术设计方案、敏捷开发管理 (Jira)、跨团队沟通、技术影响力建设 (博客/开源)。
-- 推荐资源：《代码大全》、《人月神话》。`
+      reportTitle: ''
     })
   }
 })
 
-const pageLoading = ref(true) // 初始状态为加载中
-const reportContent = ref('') // 先设为空，加载完再赋值
+const pageLoading = ref(true)
+const reportContent = ref('')
+
+// 从 learning_plan agent 获取报告
+const fetchReport = async () => {
+  try {
+    const { data } = await learningPlanApi.generate({ plan_type: '长期' })
+    if (data.learning_plan?.plan_text) {
+      reportContent.value = data.learning_plan.plan_text
+    } else if (data.learning_plan?.content) {
+      reportContent.value = data.learning_plan.content
+    } else if (data.export_text) {
+      reportContent.value = data.export_text
+    } else {
+      reportContent.value = ''
+    }
+    ElMessage({ message: '职业规划报告已生成', type: 'success', plain: true })
+  } catch {
+    reportContent.value = ''
+    ElMessage.warning('获取报告失败，请检查后端服务是否运行')
+  } finally {
+    pageLoading.value = false
+  }
+}
 
 onMounted(() => {
-  // 模拟报告生成的加载时间，例如 1.2 秒
-  setTimeout(() => {
-    reportContent.value = props.reportData.initialContent
-    pageLoading.value = false
-    ElMessage({
-      message: '职业规划报告已生成',
-      type: 'success',
-      plain: true,
-    })
-  }, 3000)
+  fetchReport()
 })
 
 // 状态管理
@@ -176,12 +169,12 @@ const lastUpdateTime = ref(new Date().toLocaleTimeString())
 const polishHistory = ref([])
 
 // 逻辑：执行润色并存入历史
-const handleAIPolish = () => {
+const handleAIPolish = async () => {
   if (!polishNote.value) return ElMessage.warning('请输入润色要求')
   polishing.value = true
-  
-  setTimeout(() => {
-    // 1. 存档当前内容
+
+  try {
+    // 存档当前内容
     polishHistory.value.unshift({
       note: polishNote.value,
       content: reportContent.value,
@@ -189,91 +182,35 @@ const handleAIPolish = () => {
       type: 'ai'
     })
 
-    // 2. 模拟覆盖
-reportContent.value = `第1阶段: Java核心技术深化与架构基础
-⏰ 时间范围: 2个月
+    // 调用 learning_plan agent 润色
+    const { data } = await learningPlanApi.polish({ user_feedback: polishNote.value })
+    if (data.learning_plan?.plan_text) {
+      reportContent.value = data.learning_plan.plan_text
+    } else if (data.export_text) {
+      reportContent.value = data.export_text
+    } else if (data.result) {
+      reportContent.value = data.result
+    }
 
-🎯 核心目标: 精通Java并发与JVM调优，掌握Spring Cloud微服务核心组件与分布式理论。
+    polishing.value = false
+    polishNote.value = ''
+    lastUpdateTime.value = new Date().toLocaleTimeString()
 
-📚 学习内容:
-Java并发编程与JVM调优
-Spring Boot/Cloud微服务架构
-分布式系统理论与消息中间件
-
-📖 推荐资源:
-《Java并发编程的艺术》
-《深入理解Java虚拟机》
-极客时间相关课程
-Spring Cloud Alibaba官方文档
-简易电商微服务实践项目
-
-第2阶段: 高并发系统与云原生
-⏰ 时间范围: 2个月
-
-🎯 核心目标: 掌握数据库与缓存高级优化，熟练使用Docker/Kubernetes进行云原生部署与运维。
-
-📚 学习内容:
-MySQL优化与Redis深度应用
-Docker与Kubernetes容器化编排
-系统监控(如Prometheus/Grafana)与设计方法论
-
-📖 推荐资源:
-《高性能MySQL》
-《Redis设计与实现》
-极客时间《Kubernetes实战》
-云平台动手实验
-研究优秀开源项目架构
-
-第3阶段: 架构设计与技术视野
-⏰ 时间范围: 1个月
-
-🎯 核心目标: 理解领域驱动设计(DDD)与整洁架构，跟踪技术趋势并开始建立技术影响力。
-
-📚 学习内容:
-领域驱动设计(DDD)核心思想
-整洁/六边形架构
-代码重构与设计模式
-前沿技术趋势跟踪
-
-📖 推荐资源:
-《领域驱动设计》
-Martin Fowler博客
-参与技术社区
-用DDD思想重构一个项目
-
-第4阶段: 综合实践与职业发展
-⏰ 时间范围: 持续进行
-
-🎯 核心目标: 通过实战项目整合技术栈，提升团队协作、技术方案设计与评审等软技能。
-
-📚 学习内容:
-主导或深度参与复杂全栈项目
-技术方案设计与评审
-项目管理与跨团队沟通
-技术面试与招聘知识
-
-📖 推荐资源:
-主动承担复杂工作或发起开源项目
-《代码大全》、《人月神话》
-进行技术分享
-模拟方案评审与面试`;
-    
-    polishing.value = false;
-    polishNote.value = '';
-    lastUpdateTime.value = new Date().toLocaleTimeString();
-    
     ElNotification({
       title: '润色完成',
       message: '旧版本已存入历史，可随时切换回滚',
       type: 'success',
       position: 'bottom-right'
-    });
-  }, 1000)
+    })
+  } catch {
+    ElMessage.error('润色失败，请重试')
+    polishing.value = false
+  }
 }
 
 // 逻辑：还原版本（含双向备份）
 const restoreVersion = (item) => {
-  // 1. 获取当前屏幕上的“即将被覆盖”的内容作为快照
+  // 1. 获取当前屏幕上的"即将被覆盖"的内容作为快照
   const currentSnapshot = {
     note: "还原前的当前版本",
     content: reportContent.value,
@@ -302,47 +239,48 @@ const toggleEdit = () => {
   if (!isEditing.value) ElMessage.success('手动修改已保存')
 }
 
-const handleDownload = () => {
-  // 1. 开启加载状态
-  downloadLoading.value = true;
+const handleDownload = async () => {
+  downloadLoading.value = true
 
-  // 2. 抓取左侧报告容器（即包含标题和正文的那块区域）
-  const element = document.querySelector('.report-display-container');
-
-  if (!element) {
-    ElMessage.error('未找到报告内容');
-    downloadLoading.value = false;
-    return;
+  // 首先调用 export API 获取最新内容
+  try {
+    const { data } = await learningPlanApi.export({})
+    if (data.export_text) {
+      reportContent.value = data.export_text
+    }
+  } catch {
+    // 继续使用当前内容
   }
 
-  // 3. 配置导出参数
+  const element = document.querySelector('.report-display-container')
+  if (!element) {
+    ElMessage.error('未找到报告内容')
+    downloadLoading.value = false
+    return
+  }
+
   const opt = {
-    margin: [10, 10], // 上下左右边距
+    margin: [10, 10],
     filename: `${props.reportData.reportTitle || '职业规划报告'}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { 
-      scale: 2, // 提高清晰度，解决模糊问题
-      useCORS: true, 
-      letterRendering: true 
-    },
+    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
+  }
 
-  // 4. 执行导出
   html2pdf()
     .set(opt)
     .from(element)
     .save()
     .then(() => {
-      downloadLoading.value = false;
-      ElMessage.success('PDF 导出成功');
+      downloadLoading.value = false
+      ElMessage.success('PDF 导出成功')
     })
     .catch((err) => {
-      console.error('导出失败:', err);
-      downloadLoading.value = false;
-      ElMessage.error('导出失败，请重试');
-    });
-};
+      console.error('导出失败:', err)
+      downloadLoading.value = false
+      ElMessage.error('导出失败，请重试')
+    })
+}
 </script>
 
 <style scoped lang="scss">

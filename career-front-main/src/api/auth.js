@@ -15,4 +15,7 @@ export const authApi = {
   logout(refreshToken) {
     return api.post('/auth/logout', { refresh_token: refreshToken })
   },
+  guestToken() {
+    return api.post('/auth/guest-token')
+  },
 }

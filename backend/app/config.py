@@ -8,20 +8,23 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "deepseek-chat"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-ada-002"
 
-    # MySQL
-    MYSQL_HOST: str = "backend-mysql"
+    # Database backend: "sqlite" (local) or "mysql" (Docker)
+    DB_BACKEND: str = "sqlite"
+
+    # MySQL (only used when DB_BACKEND="mysql")
+    MYSQL_HOST: str = "localhost"
     MYSQL_PORT: int = 3306
     MYSQL_USER: str = "root"
     MYSQL_PASSWORD: str = "root"
     MYSQL_DATABASE: str = "career_platform"
 
-    # Neo4j
-    NEO4J_URI: str = "bolt://backend-neo4j:7687"
+    # Neo4j (optional — gracefully skipped if unavailable)
+    NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "neo4jpassword"
 
-    # Redis
-    REDIS_URL: str = "redis://backend-redis:6379/0"
+    # Redis (only used when DB_BACKEND="mysql"; otherwise in-memory)
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_CACHE_TTL: int = 3600
     REDIS_RATE_LIMIT: int = 60
 

@@ -15,6 +15,18 @@ from app.config import settings
 router = APIRouter()
 
 
+@router.post("/guest-token", response_model=TokenResponse)
+async def get_guest_token():
+    """Return a guest JWT token for development/testing without DB."""
+    access_token = create_access_token(1)
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token="guest",
+        user_id=1,
+        username="guest",
+    )
+
+
 @router.post("/register")
 async def register(req: RegisterRequest, db=Depends(get_db)):
     existing = await db.execute(

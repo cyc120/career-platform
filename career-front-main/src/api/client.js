@@ -6,8 +6,19 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
+api.interceptors.request.use(async (config) => {
+  let token = localStorage.getItem('access_token')
+  if (!token && config.url !== '/auth/guest-token') {
+    // Auto-fetch guest token for development
+    try {
+      const { data } = await api.post('/auth/guest-token')
+      localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('refresh_token', data.refresh_token)
+      token = data.access_token
+    } catch {
+      // proceed without token
+    }
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

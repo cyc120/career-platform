@@ -21,21 +21,31 @@ async def get_target_job(user_id: int) -> dict | None:
 
 async def save_learning_plan(user_id: int, target_job: str,
                                plan_type: str, phases: list) -> bool:
+    from app.config import settings
+    phases_json = json.dumps(phases, ensure_ascii=False)
     async with AsyncSessionLocal() as db:
-        await db.execute(
-            text(
-                "INSERT INTO learning_plans (user_id, target_job, plan_type, phases, updated_at) "
-                "VALUES (:uid, :tj, :pt, :ph, NOW()) "
-                "ON DUPLICATE KEY UPDATE target_job = :tj2, plan_type = :pt2, "
-                "phases = :ph2, updated_at = NOW()"
-            ),
-            {
-                "uid": user_id, "tj": target_job, "pt": plan_type,
-                "ph": json.dumps(phases, ensure_ascii=False),
-                "tj2": target_job, "pt2": plan_type,
-                "ph2": json.dumps(phases, ensure_ascii=False),
-            },
-        )
+        if settings.DB_BACKEND == "sqlite":
+            await db.execute(
+                text(
+                    "INSERT OR REPLACE INTO learning_plans "
+                    "(user_id, target_job, plan_type, phases, updated_at) "
+                    "VALUES (:uid, :tj, :pt, :ph, datetime('now'))"
+                ),
+                {"uid": user_id, "tj": target_job, "pt": plan_type, "ph": phases_json},
+            )
+        else:
+            await db.execute(
+                text(
+                    "INSERT INTO learning_plans (user_id, target_job, plan_type, phases, updated_at) "
+                    "VALUES (:uid, :tj, :pt, :ph, NOW()) "
+                    "ON DUPLICATE KEY UPDATE target_job = :tj2, plan_type = :pt2, "
+                    "phases = :ph2, updated_at = NOW()"
+                ),
+                {
+                    "uid": user_id, "tj": target_job, "pt": plan_type,
+                    "ph": phases_json, "tj2": target_job, "pt2": plan_type, "ph2": phases_json,
+                },
+            )
         await db.commit()
     return True
 

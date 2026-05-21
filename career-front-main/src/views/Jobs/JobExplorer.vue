@@ -144,11 +144,21 @@ const allJobs = ref([])
 const loadJobs = async () => {
   try {
     const params = {}
-    if (searchQuery.value) params.q = searchQuery.value
     selectedTags.value.forEach((tag) => {
       params[tag.type] = tag.value
     })
-    const { data } = await jobsApi.search(searchQuery.value || '', params)
+
+    let data
+    if (searchQuery.value) {
+      // 有搜索关键词时使用 RAG 语义搜索
+      const resp = await jobsApi.search(searchQuery.value, params)
+      data = resp.data
+    } else {
+      // 无关键词时使用 SQL 直接查询，确保有数据
+      const resp = await jobsApi.list(params)
+      data = resp.data
+    }
+
     allJobs.value = (data.jobs || []).map((item, index) => ({
       ...item,
       id: item.id || index + 1,

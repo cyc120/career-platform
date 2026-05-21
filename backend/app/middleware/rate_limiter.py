@@ -16,7 +16,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         key = f"{user_id}:{datetime.utcnow().minute}"
-        allowed = await check_rate_limit(key, settings.REDIS_RATE_LIMIT)
+        try:
+            allowed = await check_rate_limit(key, settings.REDIS_RATE_LIMIT)
+        except Exception:
+            return await call_next(request)
 
         if not allowed:
             return JSONResponse(

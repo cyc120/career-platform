@@ -1,12 +1,12 @@
-"""Seed data script for development — run inside Docker container:
-  docker compose exec backend python scripts/seed_data.py
-"""
+"""Seed data script for development."""
 import asyncio
 import sys
-sys.path.insert(0, "/app")
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.utils.security import hash_password
-from app.db.mysql import AsyncSessionLocal, engine
+from app.db.mysql import AsyncSessionLocal
 from sqlalchemy import text
 
 
@@ -50,7 +50,7 @@ async def seed():
             hashed = hash_password(pwd)
             await db.execute(
                 text(
-                    "INSERT IGNORE INTO users (username, email, password_hash) "
+                    "INSERT OR IGNORE INTO users (username, email, password_hash) "
                     "VALUES (:u, :e, :h)"
                 ),
                 {"u": username, "e": email, "h": hashed},
@@ -59,9 +59,9 @@ async def seed():
         for title, company, industry, city, salary, desc, reqs in SEED_JOBS:
             await db.execute(
                 text(
-                    "INSERT IGNORE INTO jobs (job_title, company, industry, city, "
+                    "INSERT OR IGNORE INTO jobs (job_title, company, industry, city, "
                     "salary_range, job_description, requirements, publish_date) "
-                    "VALUES (:t, :c, :i, :ci, :s, :d, :r, CURDATE())"
+                    "VALUES (:t, :c, :i, :ci, :s, :d, :r, DATE('now'))"
                 ),
                 {"t": title, "c": company, "i": industry, "ci": city, "s": salary, "d": desc, "r": reqs},
             )
@@ -69,7 +69,7 @@ async def seed():
         for cur, nxt, skills, yrs, ttype in SEED_PROMOTIONS:
             await db.execute(
                 text(
-                    "INSERT IGNORE INTO promotion_transition "
+                    "INSERT OR IGNORE INTO promotion_transition "
                     "(current_role, next_role, required_skills, years_exp, transition_type) "
                     "VALUES (:cr, :nr, :sk, :yr, :tt)"
                 ),

@@ -45,17 +45,27 @@ async def get_job_details(job_ids: list[int]) -> list[dict]:
 
 async def save_user_profile(user_id: int, profile_data: dict) -> bool:
     import json
+    from app.config import settings
+    pd = json.dumps(profile_data, ensure_ascii=False)
     async with AsyncSessionLocal() as db:
-        await db.execute(
-            text(
-                "INSERT INTO user_profiles (user_id, profile_data, status) "
-                "VALUES (:uid, :pd, 'active') "
-                "ON DUPLICATE KEY UPDATE profile_data = :pd2, "
-                "updated_at = CURRENT_TIMESTAMP"
-            ),
-            {"uid": user_id, "pd": json.dumps(profile_data, ensure_ascii=False),
-             "pd2": json.dumps(profile_data, ensure_ascii=False)},
-        )
+        if settings.DB_BACKEND == "sqlite":
+            await db.execute(
+                text(
+                    "INSERT OR REPLACE INTO user_profiles (user_id, profile_data, status, updated_at) "
+                    "VALUES (:uid, :pd, 'active', datetime('now'))"
+                ),
+                {"uid": user_id, "pd": pd},
+            )
+        else:
+            await db.execute(
+                text(
+                    "INSERT INTO user_profiles (user_id, profile_data, status) "
+                    "VALUES (:uid, :pd, 'active') "
+                    "ON DUPLICATE KEY UPDATE profile_data = :pd2, "
+                    "updated_at = CURRENT_TIMESTAMP"
+                ),
+                {"uid": user_id, "pd": pd, "pd2": pd},
+            )
         await db.commit()
     return True
 
@@ -68,7 +78,7 @@ async def save_match_report(user_id: int, job_name: str, match_score: float,
             text(
                 "INSERT INTO matching_report (user_id, job_name, industry, city, "
                 "match_score, report_data, publish_date) "
-                "VALUES (:uid, :jn, :ind, :ct, :ms, :rd, CURDATE())"
+                "VALUES (:uid, :jn, :ind, :ct, :ms, :rd, DATE('now'))"
             ),
             {
                 "uid": user_id, "jn": job_name, "ind": industry, "ct": city,

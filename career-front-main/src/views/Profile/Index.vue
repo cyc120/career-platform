@@ -131,27 +131,21 @@
                     <h4>实时画像预览</h4>
                     <div class="completion-status">
                       <span class="percentage">
-                        {{ currentStepIndex === 0 ? '0%' : currentStepIndex === 1 ? '14%' : currentStepIndex === 2 ? '100%' : '100%' }}
+                        {{ completionLabel }}
                       </span>
-                      <span class="label">维度完善度</span>
+                      <span class="label">维度完善度 ({{ analyzedCount }}/7)</span>
                     </div>
                   </div>
                   
                   <div class="scroll-container">
-                    <div v-if="currentStepIndex > 0" class="highlight-tags">
-                      <el-tag v-for="tag in currentHighlights" :key="tag" size="small" effect="plain" class="glow-tag">
-                        {{ tag }}
-                      </el-tag>
-                    </div>
-
                     <div class="preview-radar-placeholder">
                       <RadarChart :data="currentRadarData" />
                     </div>
 
-                    <div v-if="currentStepIndex > 0" class="dimension-grid">
-                      <div 
-                        v-for="(val, key) in dimensionDetails" 
-                        :key="key" 
+                    <div v-if="analyzedCount > 0" class="dimension-grid">
+                      <div
+                        v-for="(val, key) in dimensionDetails"
+                        :key="key"
                         :class="['dimension-card', val.type]"
                       >
                         <div class="dim-header">
@@ -163,8 +157,9 @@
                         <p class="dim-desc">{{ val.desc }}</p>
                       </div>
                     </div>
-                    
-                    <p class="empty-preview-tip">
+
+                    <p v-else class="empty-preview-tip">
+                      请在左侧对话中完善个人信息，AI 将实时生成能力画像
                     </p>
                   </div>
                 </div>
@@ -208,9 +203,15 @@
 </template>
 
 <script setup>
-import { ref, nextTick, computed } from 'vue'
-import { Refresh, Histogram, Upload } from '@element-plus/icons-vue'
+import { ref, nextTick, computed, onMounted } from 'vue'
+import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { learningPlanApi } from '@/api/learningPlan'
+import * as mammoth from 'mammoth'
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // 导入你的子组件
 import PersonalInfo from './PersonalInfo.vue'
@@ -220,23 +221,62 @@ import PolishAndExport from './PolishAndExport.vue'
 import FavoriteJobs from './FavoriteJobs.vue'
 import RadarChart from '../../components/RadarChart.vue'
 const attachedFile = ref(null) // 存储文件对象
+const fileExtractedText = ref('') // 从文件中提取的文本
+
+// 🌟 从文件中提取文本内容
+const extractFileText = async (file) => {
+  const ext = file.name.split('.').pop().toLowerCase()
+
+  if (ext === 'txt') {
+    return await file.text()
+  }
+
+  if (ext === 'pdf') {
+    const buffer = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+    const pages = []
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      pages.push(content.items.map(item => item.str).join(' '))
+    }
+    return pages.join('\n')
+  }
+
+  if (ext === 'docx' || ext === 'doc') {
+    const buffer = await file.arrayBuffer()
+    const result = await mammoth.extractRawText({ arrayBuffer: buffer })
+    return result.value
+  }
+
+  return ''
+}
 
 // 🌟 处理文件选择逻辑
-const handleFileChange = (file) => {
-  // 校验文件大小 (例如 5MB 限制)
+const handleFileChange = async (file) => {
   const isLt5M = file.size / 1024 / 1024 < 5
   if (!isLt5M) {
     ElMessage.error('上传附件大小不能超过 5MB!')
     return
   }
-  
-  attachedFile.value = file.raw // 存储原始 File 对象
-  ElMessage.success(`已添加附件: ${file.name}`)
+
+  attachedFile.value = file.raw
+  fileExtractedText.value = ''
+
+  try {
+    const text = await extractFileText(file.raw)
+    fileExtractedText.value = text
+    ElMessage.success(`已添加附件: ${file.name} (${text.length}字)`)
+  } catch (err) {
+    console.error('[Upload] File extraction failed:', err)
+    ElMessage.warning('文件解析失败，将仅发送文件名')
+  }
 }
 
 // 🌟 移除附件逻辑
 const removeFile = () => {
   attachedFile.value = null
+  fileExtractedText.value = ''
 }
 
 const activeTab = ref('info')
@@ -248,123 +288,134 @@ const avatarUrl = ref('https://ui-avatars.com/api/?name=User&size=120&background
 
 const userInfo = ref({ name: '', email: '', rawResumeText: '', school: '' })
 
-// --- 新增：模拟 AI 剧本配置 ---
-const scriptSteps = [
-  {
-    answer: "你提到参加过创新创业大赛，可以具体聊聊你的项目是什么，以及取得了什么样的成绩吗？ 关于在腾讯的实习经历，你当时是在哪个岗位实习呢？主要负责哪些工作，有没有什么让你印象深刻的成果呀？ 除了Python编程，你有没有考取过什么相关的证书呢？ 你觉得自己的学习能力怎么样呀？有没有什么快速掌握新知识的例子可以分享呢？ 在团队合作或者项目中，你通常是如何与队友沟通的呢？ 面对压力比较大的任务或项目时，你一般会怎么应对呢？",
-    radarData: [40, 30, 0, 50, 0, 0, 0], // 对应 9 维能力的数值
-  },
-  {
-    answer: "🎉 信息已完善！恭喜您完成了所有7个维度的信息采集",
-    radarData: [85, 90, 95, 95, 80, 85, 60],
-  },
-  {
-    answer: "分析已全部完成！基于你目前的表现，我为你匹配了‘前端开发’、‘UI 交互’等目标岗位。你可以点击下方的‘保存并开始 AI 深度分析’，查看完整的职业路线图和优化策略。",
-    radarData: [90, 85, 90, 80, 85, 90, 85],
+// --- 聊天状态 ---
+const currentStepIndex = ref(0)
+const currentRadarData = ref([0, 0, 0, 0, 0, 0, 0])
+const dimensionDetailsRaw = ref(null)
+const chatMessages = ref([])
+const chatGreeted = ref(false)
+
+// AI 初始问候
+const initChatGreeting = async () => {
+  if (chatGreeted.value) return
+  chatGreeted.value = true
+  loading.value = true
+  try {
+    console.log('[Coach] Sending greeting request...')
+    const resp = await learningPlanApi.coach(
+      '新用户首次对话。用一句话打招呼，然后问：什么学校、什么方向（前端/后端/算法/AI等）、大几。', []
+    )
+    console.log('[Coach] Response status:', resp.status)
+    console.log('[Coach] Response data:', resp.data)
+    const reply = resp.data?.reply
+    if (reply) {
+      chatMessages.value.push({ id: Date.now(), role: 'assistant', content: reply })
+      console.log('[Coach] Greeting added to chat')
+    } else {
+      console.warn('[Coach] No reply field in response:', resp.data)
+    }
+    // 处理问候阶段的画像数据
+    if (resp.data?.radar_data) {
+      currentRadarData.value = resp.data.radar_data
+    }
+    if (resp.data?.dimension_details && Object.keys(resp.data.dimension_details).length > 0) {
+      dimensionDetailsRaw.value = resp.data.dimension_details
+      currentStepIndex.value = 2
+    }
+  } catch (err) {
+    console.error('[Coach] Greeting failed:', err)
+  } finally {
+    loading.value = false
   }
-];
+}
 
-
-
-// --- 新增：状态追踪变量 ---
-const currentStepIndex = ref(0); // 记录当前对话到第几轮了
-const currentRadarData = ref([0, 0, 0, 0, 0, 0, 0]); // 传给右侧看板的数据
-
-// 在 script 标签内添加
-const currentHighlights = computed(() => {
-  const highlights = [
-    [], // 初始状态
-    ['熟悉 Python'],
-    ['计算机二级', '掌握数据结构与算法', '精通Java/Python等开发技术']
-  ];
-  return highlights[currentStepIndex.value] || highlights[2];
-});
-
-const currentSuggestion = computed(() => {
-  const suggestions = [
-    '',
-    '建议强化实战项目中的困难解决方案描述。',
-    '画像已成熟，建议考取计算机二级证书并加强抗压练习。'
-  ];
-  return suggestions[currentStepIndex.value] || suggestions[2];
-});
-
-const chatMessages = ref([
-  { id: 1, role: 'assistant', content: '您好！我是您的AI职业向导。您可以直接粘贴简历内容或上传文件。' }
-])
-
-const quickActions = [
-  { label: '📝 开始分析', command: '分析我的简历' },
-  { label: '🔍 检查完整度', command: '简历完整度检查' }
-]
-
-const progressValue = computed(() => userInfo.value.rawResumeText.length > 50 ? 85 : 10)
+onMounted(() => {
+  initChatGreeting()
+})
 
 // 🌟 修复核心：确保菜单选择逻辑能干净地切换 activeTab
 const handleMenuSelect = (index) => {
   activeTab.value = index
 }
 
-// 🌟 修改发送逻辑
+// 🌟 发送消息：真实 AI 驱动
 const handleSend = async () => {
-  // 1. 拦截逻辑：文字和附件都为空时才拦截
   if (!inputValue.value.trim() && !attachedFile.value) {
     ElMessage.warning('请输入内容或上传简历附件')
     return
   }
 
-  // 2. 构造用户消息内容
-  // 如果有文件，展示 [附件:文件名]；如果有文字，也一并拼接到内容里
-  let displayContent = inputValue.value;
+  let displayContent = inputValue.value
+  const extractedText = fileExtractedText.value
   if (attachedFile.value) {
-    displayContent += displayContent ? `\n[附件: ${attachedFile.value.name}]` : `[附件: ${attachedFile.value.name}]`;
+    displayContent += displayContent ? `\n[附件: ${attachedFile.value.name}]` : `[附件: ${attachedFile.value.name}]`
   }
 
-  // 3. 🌟 关键：推送到聊天记录数组 (注意：这里使用你原本代码中的 chatMessages)
   chatMessages.value.push({
     id: Date.now(),
     role: 'user',
     content: displayContent,
     time: new Date().toLocaleTimeString()
-  });
+  })
 
-  // 4. 更新简历文本（模拟你的业务逻辑）
   if (inputValue.value) {
-    userInfo.value.rawResumeText += inputValue.value;
+    userInfo.value.rawResumeText += inputValue.value
   }
 
-  // 5. 清空输入状态
-  const savedInputValue = inputValue.value; // 如果后续 API 需要用到，可以先存一下
-  inputValue.value = '';
-  attachedFile.value = null; // 清空附件，让 UI 上的标签消失
+  inputValue.value = ''
+  attachedFile.value = null
+  fileExtractedText.value = ''
 
-  // 6. UI 反馈与滚动
-  loading.value = true;
-  await scrollToBottom();
+  loading.value = true
+  await scrollToBottom()
 
-  // 7. 模拟 AI 回复
-  // 🌟 找到原有 handleSend 的 setTimeout 部分并替换
-setTimeout(async () => {
-  // 1. 根据当前步数获取剧本内容，如果超出剧本长度则循环最后一条
-  const step = scriptSteps[currentStepIndex.value] || scriptSteps[scriptSteps.length - 1];
+  try {
+    const history = chatMessages.value
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .slice(0, -1)
+      .map(m => ({ role: m.role, content: m.content }))
 
-  // 2. 将硬编码的回答推送到聊天列表
-  chatMessages.value.push({
-    id: Date.now(),
-    role: 'assistant',
-    content: step.answer, // 使用剧本里的回答
-    time: new Date().toLocaleTimeString()
-  });
+    // 拼接用户输入 + 文件提取文本
+    const userTyped = displayContent.replace(/\[附件:.*?\]/g, '').trim()
+    let userText = userTyped
+    if (extractedText) {
+      userText = userTyped
+        ? `${userTyped}\n\n以下是我的简历内容：\n${extractedText}`
+        : `以下是我的简历内容：\n${extractedText}`
+    }
+    console.log('[Coach] Sending message:', userText.slice(0, 100), '...')
+    const resp = await learningPlanApi.coach(userText || '请分析我的简历', history, {
+      previous_radar_data: currentRadarData.value,
+      previous_details: dimensionDetailsRaw.value,
+    })
+    console.log('[Coach] Response:', resp.status, resp.data)
+    const reply = resp.data?.reply
 
-  // 3. 🌟 关键：更新右侧看板所需的数据变量
-  currentRadarData.value = step.radarData;
+    chatMessages.value.push({
+      id: Date.now(),
+      role: 'assistant',
+      content: reply || '抱歉，暂时无法回复。'
+    })
 
-  // 4. 对话步数加 1
-  currentStepIndex.value++;
-
-  loading.value = false;
-  await scrollToBottom();
-}, 3000); // 稍微延长到 1.2s，模拟 AI 思考和更新画像的过程
+    // 使用AI画像分析结果更新雷达图
+    if (resp.data?.radar_data) {
+      currentRadarData.value = resp.data.radar_data
+    }
+    if (resp.data?.dimension_details && Object.keys(resp.data.dimension_details).length > 0) {
+      dimensionDetailsRaw.value = resp.data.dimension_details
+      currentStepIndex.value = 2
+    }
+  } catch (err) {
+    console.error('[Coach] Send failed:', err)
+    chatMessages.value.push({
+      id: Date.now(),
+      role: 'assistant',
+      content: '抱歉，AI 服务暂时不可用，请稍后再试。'
+    })
+  } finally {
+    loading.value = false
+    await scrollToBottom()
+  }
 }
 
 const saveAndContinue = () => {
@@ -373,88 +424,32 @@ const saveAndContinue = () => {
   sessionStorage.setItem('is_profile_completed', 'true');
 }
 
-const handleFileUpload = () => {
-  ElMessage.success('文件解析中...')
-}
-
-const handleQuickAction = (cmd) => {
-  inputValue.value = cmd
-  handleSend()
-}
-
 const scrollToBottom = async () => {
   await nextTick()
   if (messageListRef.value) messageListRef.value.scrollTop = messageListRef.value.scrollHeight
 }
 
-const handleDeepAnalysis = () => {
-  // 1. 设置临时标记，告知首页信息已填
-  sessionStorage.setItem('is_profile_completed', 'true');
-  
-  // 2. 原有的跳转逻辑
-  router.push('/').then(() => {
-    // 强制刷新一下首页的状态（可选，如果 Home 逻辑没跑）
-    window.location.reload(); 
-  });
-};
-
-// 找到 Index.vue 中的 dimensionDetails 部分，替换为以下代码
 const dimensionDetails = computed(() => {
-  // 默认初始状态或第一轮对话的状态
-  const defaultDetails = {
-    "专业技能": { status: "已完善", desc: "会Python编程", type: "success" },
-    "证书": { status: "未提及", desc: "用户未提及此维度", type: "info" },
-    "创新能力": { status: "不清楚", desc: "用户提及但无具体例子", type: "warning" },
-    "学习能力": { status: "未提及", desc: "用户未提及此维度", type: "info" },
-    "抗压能力": { status: "未提及", desc: "用户未提及此维度", type: "info" },
-    "沟通能力": { status: "未提及", desc: "用户未提及此维度", type: "info" },
-    "实习能力": { status: "不清楚", desc: "用户提及但无具体例子", type: "warning" }
-  };
+  const dimensions = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
+  if (dimensionDetailsRaw.value) {
+    return dimensionDetailsRaw.value
+  }
+  return Object.fromEntries(dimensions.map(d => [d, { status: '待采集', desc: '请通过对话提供信息', type: 'info' }]))
+})
 
-  // 第二轮对话及以后（currentStepIndex >= 2）返回你要求的完整信息
-  const completedDetails = {
-    "专业技能": { 
-      status: "已完善", 
-      desc: "精通Java/Python等开发技术；扎实掌握数据结构与算法", 
-      type: "success" 
-    },
-    "证书": { 
-      status: "已完善", 
-      desc: "持有计算机二级等专业证书", 
-      type: "success" 
-    },
-    "创新能力": { 
-      status: "已完善", 
-      desc: "主导大创项目，运用知识图谱等技术实现创新方案，成果显著；参加过创新创业大赛", 
-      type: "success" 
-    },
-    "学习能力": { 
-      status: "已完善", 
-      desc: "GPA 3.7/4.0，专业排名前10%；自主学习能力强，能快速掌握新技术", 
-      type: "success" 
-    },
-    "抗压能力": { 
-      status: "已完善", 
-      desc: "能高效应对项目攻坚、多任务并行等高压场景，按时高质量完成目标", 
-      type: "success" 
-    },
-    "沟通能力": { 
-      status: "已完善", 
-      desc: "具备优秀跨部门协作与团队统筹能力，高效推进项目落地", 
-      type: "success" 
-    },
-    "实习能力": { 
-      status: "已完善", 
-      desc: "在腾讯实习过，参与企业软件开发全流程，完成功能开发、测试优化，积累扎实工程实践经验", 
-      type: "success" 
-    }
-  };
+const analyzedCount = computed(() => {
+  const details = dimensionDetails.value
+  if (!details) return 0
+  return Object.values(details).filter(d => d.status === '已分析').length
+})
 
-  // 根据当前对话步数切换显示内容
-  // 因为你在 handleSend 中每次回复后会 currentStepIndex.value++
-  // 初始是 0，第一次回复后是 1，第二次回复后是 2
-  return currentStepIndex.value >= 2 ? completedDetails : defaultDetails;
-});
+const completionLabel = computed(() => {
+  const n = analyzedCount.value
+  if (n === 0) return '--'
+  if (n <= 3) return '建议继续补充'
+  if (n <= 5) return '完善度较高'
+  return '已完善可分析'
+})
 </script>
 
 <style scoped lang="scss">
@@ -828,7 +823,7 @@ const dimensionDetails = computed(() => {
     display: flex;
     gap: 12px;
     max-width: 85%;
-    align-items: flex-end; /* 头像与气泡底部对齐 */
+    align-items: flex-start;
 
     /* AI 助手样式 */
     &.assistant {

@@ -11,8 +11,11 @@ async def get_current_user(
 ) -> dict:
     token = credentials.credentials
 
-    if await is_token_blacklisted(token):
-        raise HTTPException(status_code=401, detail="Token revoked")
+    try:
+        if await is_token_blacklisted(token):
+            raise HTTPException(status_code=401, detail="Token revoked")
+    except Exception:
+        pass  # Redis unavailable — allow request
 
     try:
         user_id = decode_access_token(token)

@@ -79,16 +79,19 @@ class AgentHarness:
         input_hash = hash_input(input_data)
         run_id = str(uuid.uuid4())
 
-        # Check cache
+        # Check cache (skip if Redis unavailable)
         if agent.cacheable and not force_refresh:
-            cached = await get_cached_agent_result(agent_id, input_hash)
-            if cached:
-                return {
-                    "success": True,
-                    "data": json.loads(cached),
-                    "cached": True,
-                    "run_id": run_id,
-                }
+            try:
+                cached = await get_cached_agent_result(agent_id, input_hash)
+                if cached:
+                    return {
+                        "success": True,
+                        "data": json.loads(cached),
+                        "cached": True,
+                        "run_id": run_id,
+                    }
+            except Exception:
+                pass  # Redis unavailable — skip cache
 
         # Execute with retry
         last_error = None
@@ -101,13 +104,16 @@ class AgentHarness:
                 )
                 duration_ms = int((time.monotonic() - started_at) * 1000)
 
-                # Cache result
+                # Cache result (skip if Redis unavailable)
                 if agent.cacheable:
-                    await cache_agent_result(
-                        agent_id, input_hash,
-                        json.dumps(result, ensure_ascii=False, default=str),
-                        ttl=settings.REDIS_CACHE_TTL,
-                    )
+                    try:
+                        await cache_agent_result(
+                            agent_id, input_hash,
+                            json.dumps(result, ensure_ascii=False, default=str),
+                            ttl=settings.REDIS_CACHE_TTL,
+                        )
+                    except Exception:
+                        pass  # Redis unavailable — skip caching
 
                 return {
                     "success": True,

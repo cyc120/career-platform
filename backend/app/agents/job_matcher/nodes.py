@@ -61,6 +61,8 @@ async def neo4j_enrich(state: JobMatcherState) -> Dict:
 
     try:
         session = await neo4j_manager.get_session()
+        if session is None:
+            return {"neo4j_profiles": []}
         for job in jobs:
             result = await session.run(
                 "MATCH (jp:JobProfile {title: $title}) RETURN jp",

@@ -1,10 +1,11 @@
-"""Unified Agent Registry — all 4 agents registered with Harness."""
+"""Unified Agent Registry — all 5 agents registered with Harness."""
 
 from app.agents.harness import harness
 from app.agents.resume_analyzer.graph import agent as resume_analyzer
 from app.agents.job_matcher.graph import agent as job_matcher
 from app.agents.career_planner.graph import agent as career_planner
 from app.agents.learning_plan.graph import agent as learning_plan
+from app.agents.profile_analyzer.graph import agent as profile_analyzer
 
 _initialized = False
 
@@ -18,4 +19,5 @@ def init_agents():
     harness.register(job_matcher)
     harness.register(career_planner)
     harness.register(learning_plan)
+    harness.register(profile_analyzer)
     _initialized = True

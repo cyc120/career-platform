@@ -15,7 +15,7 @@
                     <div class="target-job-info">
                       <span class="dot"></span>
                       <span class="job-label">目标岗位：</span>
-                      <span class="job-name">Java</span>
+                      <span class="job-name">{{ targetJobName || '--' }}</span>
                     </div>
                     <div class="gauge-wrapper">
                       <div ref="gaugeRef" class="gauge-chart"></div>
@@ -153,16 +153,19 @@
 <script setup>
 import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import { 
-  ChatDotRound, ChatLineRound, Document, Location, Money, TrendCharts, Guide, Finished,Histogram,Checked,Loading // 补全引用
+import {
+  ChatDotRound, ChatLineRound, Document, Location, Money, TrendCharts, Guide, Finished,Histogram,Checked,Loading
 } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus' // 用于展示网络错误
+import { ElMessage } from 'element-plus'
+import { matchingApi } from '@/api/matching'
+import { careerPlanApi } from '@/api/careerPlan'
 
 // ==================== 状态变量 ====================
 const activeTab = ref('matching')
 
 // 核心数据变量
 const overallScore = ref(0)
+const targetJobName = ref('')
 const aiSummary = ref('')
 const skillDetails = ref([])
 const detailedAnalysis = ref('')
@@ -216,90 +219,88 @@ const loadMapData = async () => {
   }
 };
 
-// ==================== 2. 模拟数据获取函数 ====================
-const mockFetchData = () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // === Tab 1 数据 ===
-      overallScore.value = 89.62
-      aiSummary.value = '分析结论：候选人展现出了极高的职业素养与技术潜力，综合匹配度优秀。在硬实力方面，凭借 GPA 3.7 (前10%) 的卓越学术表现及 腾讯实习 的全流程工程实践经验，候选人在学习能力与实习能力上显著超出岗位预期。特别是在 Java 开发领域，候选人不仅扎实掌握了核心算法，更具备多语言开发视野。在软实力维度，候选人主导的大创项目证明了其在复杂问题解决上的创新思维，且具备应对高压场景的心理素质与跨部门协作的沟通统筹能力。优化建议：目前主要的进阶空间在于“行业垂直认证”。虽然持有通用计算机证书，但建议针对性地补全 Java 专项认证（如 Oracle 认证） 或金融科技相关的行业证书，以消除在专项资质上的微弱差距，进一步巩固竞争优势。'
-skillDetails.value = [
-  {
-    name: '专业技能',
-    score: 90,
-    comment: "与目标公司要求差距：用户精通Java/Python等开发技术，扎实掌握数据结构与算法，与Java后端开发岗位要求高度匹配，且技能深度超出基础要求。；与行业普遍要求差距：用户精通Java/Python等开发技术，扎实掌握数据结构与算法，与岗位要求的'精通Java(JDK8+), 掌握Lambda'基本匹配。但岗位要求可能更聚焦于Java生态的深度，而用户展示了多语言能力，在Java特定领域的专注度上可能存在轻微差距。"
-  },
-  {
-    name: '创新能力',
-    score: 92.5,
-    comment: "与目标公司要求差距：用户主导过大创项目并运用知识图谱等技术，参加过创新创业大赛，展现出优秀的创新思维和实践能力，与需要解决复杂问题的开发岗位高度匹配。；与行业普遍要求差距：用户主导大创项目并运用知识图谱等技术实现创新方案，参加过创新创业大赛，成果显著。这完全匹配甚至可能超出岗位对'创新能力'的常规期望，表现出优秀的实践创新和问题解决能力。"
-  },
-  {
-    name: '学习能力',
-    score: 96.5,
-    comment: "与目标公司要求差距：GPA 3.7/4.0，专业排名前10%，且具备快速掌握新技术的能力，表明其学习能力极强，能迅速适应金融科技领域的技术迭代 and 业务需求。；与行业普遍要求差距：用户GPA 3.7/4.0，专业排名前10%，且自主学习能力强，能快速掌握新技术。这完全匹配并显著超出岗位对'学习能力'的要求，证明了其卓越的学术基础和持续学习潜力。"
-  },
-  {
-    name: '实习能力',
-    score: 95,
-    comment: "与目标公司要求差距：在腾讯的实习经历，参与企业软件开发全流程，积累了扎实的工程实践经验，与岗位要求的后端开发实战能力高度契合，且平台经验有加分。；与行业普遍要求差距：用户在腾讯实习，参与企业软件开发全流程，完成功能开发、测试优化，积累了扎实的工程实践经验。这与岗位要求的'实习能力'完全匹配，且实习平台和经历质量很高，是显著优势。"
-  },
-  {
-    name: '抗压能力',
-    score: 90,
-    comment: "与目标公司要求差距：能高效应对项目攻坚、多任务并行的高压场景，这与金融科技行业快节奏、高要求的工作环境非常匹配，无明显差距。；与行业普遍要求差距：用户能高效应对项目攻坚、多任务并行等高压场景，按时高质量完成目标。这与岗位要求的'抗压能力'完全匹配，且有腾讯实习经历作为有力佐证。"
-  },
-  {
-    name: '沟通能力',
-    score: 90,
-    comment: "与目标公司要求差距：具备优秀的跨部门协作与团队统筹能力，能高效推进项目落地，完全满足开发岗位所需的团队协作和沟通要求。；与行业普遍要求差距：用户具备优秀跨部门协作与团队统筹能力，能高效推进项目落地。这与岗位要求的'沟通能力'完全匹配，展现了在复杂项目环境中所需的协作和协调技能。"
-  },
-  {
-    name: '证书',
-    score: 72.5,
-    comment: "与目标公司要求差距：持有计算机二级等专业证书，符合技术岗位的基本证书要求，但与金融科技公司可能更看重的行业特定证书（如金融、安全相关）存在一定差距。；与行业普遍要求差距：用户持有计算机二级等专业证书，但岗位明确要求'Java相关认证'（如Oracle认证等）。计算机二级证书是通用证书，与Java专项认证存在明显差距，不完全符合岗位的针对性要求。"
+// ==================== 2. API 数据获取函数 ====================
+
+// 调用 job_matcher agent
+const fetchMatchingData = async () => {
+  try {
+    const { data } = await matchingApi.match()
+    // 总体匹配度
+    if (data.ranked_results && data.ranked_results.length > 0) {
+      const top = data.ranked_results[0]
+      overallScore.value = Math.round((top.score || top.overall_score || 85) * 100) / 100
+      if (top.job_name || top.title) targetJobName.value = top.job_name || top.title
+      if (top.summary) {
+        aiSummary.value = top.summary
+      }
+    }
+    // 技能维度详情
+    if (data.ranked_results && data.ranked_results.length > 0) {
+      const top = data.ranked_results[0]
+      if (top.skill_details) {
+        skillDetails.value = top.skill_details.map((s) => ({
+          name: s.name || s.dimension,
+          score: s.score || 80,
+          comment: s.comment || s.analysis || '',
+        }))
+      } else if (top.dimensions) {
+        skillDetails.value = top.dimensions.map((d) => ({
+          name: d.name || d.dimension,
+          score: d.score || 80,
+          comment: d.comment || d.analysis || '',
+        }))
+      }
+    }
+    // 备选: 从 match_results 中提取
+    if (skillDetails.value.length === 0 && data.match_results) {
+      const first = Array.isArray(data.match_results) ? data.match_results[0] : null
+      if (first?.dimensions) {
+        skillDetails.value = first.dimensions.map((d) => ({
+          name: d.name || d.dimension,
+          score: d.score || 80,
+          comment: d.comment || d.analysis || '',
+        }))
+      }
+    }
+  } catch {
+    ElMessage.warning('获取匹配数据失败')
   }
-]
-      detailedAnalysis.value = `
-        <h4 style="color: #3c4e68; font-size: 16px; margin-top: 0;">📊 核心能力综合评估</h4>
-        <p>评估结论：技术广度与工程实践能力在行业中处于前 <strong>15%</strong> 水平。雷达图能力分布健康。</p>
-        <p>您的最大闪光点在于：<strong>将业务需求迅速转化为工程落地</strong> 的能力。</p>
-        <div style="background: rgba(80, 152, 249, 0.05); padding: 15px; border-radius: 8px; border: 1px dashed rgba(80, 152, 249, 0.3); color: #3c4e68; font-size: 13.5px; line-height: 1.8; margin-top: 15px;">
-          <strong>💡 深度提分建议：</strong><br>
-          当前评估中唯一的相对短板在于“量化成果展示”。在后续简历及沟通中，应强化例如「通过XXX优化将响应时间提升 40%」或「自动化重构使研发成本降低 25%」等具体指标，这将显著提升综合评分。
-        </div>
-      `
-
-      // === Tab 2 数据 ===
-      expectedCities.value = [
-        { name: '北京', value: 100 },
-        { name: '深圳', value: 95 },
-        { name: '杭州', value: 85 }
-      ]
-
-      salaryForecast.value = [
-        { year: 2026, value: 75, reason: '入门级，核心工程能力建设' },
-        { year: 2027, value: 72, reason: '微服务架构/技术选型 + 核心骨干' },
-        { year: 2028, value: 70, reason: '独立负责系统架构 + 技术栈广度拓展' },
-        { year: 2029, value: 68, reason: '晋升技术专家/团队Leader级别' },
-        { year: 2030, value: 65, reason: '架构师/技术总监，行业影响力' }
-      ]
-
-      jobDemandTrend.value = [
-        { year: 2026, value: 62.2, reason: '市场平稳，基础岗位需求稳定' },
-        { year: 2027, value: 65.5, reason: '行业数字化/国产化替代加速' },
-        { year: 2028, value: 68.88, reason: 'AI 深度应用落地 + 人才缺口扩大' },
-        { year: 2029, value: 72.65, reason: '市场回归理性，高端人才依然紧缺' },
-        { year: 2030, value: 75.31, reason: '复合型、专家型人才持续热门' }
-      ]
-
-      mapLoaded.value = true
-      careerPathLoaded.value = true
-
-      resolve()
-    }, 1200)
-  })
 }
+
+// 调用 career_planner agent
+const fetchPlanningData = async () => {
+  try {
+    const { data } = await careerPlanApi.generate()
+    // 期望城市
+    if (data.top_job?.cities) {
+      expectedCities.value = data.top_job.cities
+    } else if (data.career_path?.cities) {
+      expectedCities.value = data.career_path.cities
+    }
+    // 薪资预测
+    if (data.trends?.salary_forecast) {
+      salaryForecast.value = data.trends.salary_forecast
+    } else if (data.career_path?.salary_forecast) {
+      salaryForecast.value = data.career_path.salary_forecast
+    }
+    // 岗位需求趋势
+    if (data.trends?.demand_trend) {
+      jobDemandTrend.value = data.trends.demand_trend
+    } else if (data.career_path?.demand_trend) {
+      jobDemandTrend.value = data.career_path.demand_trend
+    }
+    // 职业路径
+    if (data.promotion_data) {
+      promotionData.value = data.promotion_data
+    }
+    mapLoaded.value = true
+    careerPathLoaded.value = true
+  } catch {
+    ElMessage.warning('获取职业规划数据失败')
+  }
+}
+
+const promotionData = ref([])
 
 // ==================== 3. 辅助函数 ====================
 const getScoreLevel = (score) => {
@@ -663,14 +664,14 @@ const handleResize = () => {
 // ==================== 5. 生命周期 ====================
 onMounted(async () => {
   // 1. 预加载地图数据，防止闪烁
-  loadMapData();
-  
-  // 2. 获取业务数据
-  await mockFetchData();
-  
+  loadMapData()
+
+  // 2. 并行获取人岗匹配 + 职业规划数据
+  await Promise.all([fetchMatchingData(), fetchPlanningData()])
+
   // 3. 初始化图表
-  initAllCharts();
-  
+  initAllCharts()
+
   window.addEventListener('resize', handleResize)
 })
 

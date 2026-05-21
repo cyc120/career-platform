@@ -1,26 +1,6 @@
 <template>
   <div class="home">
-    <div v-if="showProfileGuide" class="force-guide-overlay">
-      <div class="guide-glass-card">
-        <div class="icon-section">
-          <el-icon :size="60" color="#667eea"><UserFilled /></el-icon>
-        </div>
-        <h2 class="guide-title">完善职业画像</h2>
-        <p class="guide-desc">
-          欢迎来到 <strong>职途无限</strong>。<br/>
-          为了通过 AI 为您精准匹配晋升路径，请先前往个人中心填写您的背景信息。
-        </p>
-        <el-button 
-          type="primary" 
-          size="large" 
-          class="guide-enter-btn"
-          @click="goToPersonalCenter"
-        >
-          立即前往完善
-        </el-button>
-      </div>
-    </div>
-    <div :class="{ 'blur-bg': showProfileGuide }">
+    <div>
     <!-- 1. 顶部区域 -->
     <header class="home-header">
       <div class="header-content">
@@ -383,6 +363,17 @@
       </p>
     </footer>
     </div>
+
+    <!-- 悬浮球：提醒完善个人信息 -->
+    <div v-if="!isProfileCompleted" class="floating-profile-ball" @click="router.push('/profile')">
+      <button class="ball-close" @click.stop="dismissGuide">&times;</button>
+      <div class="ball-icon">
+        <el-icon :size="24"><UserFilled /></el-icon>
+      </div>
+      <span class="ball-text">完善信息</span>
+      <span class="ball-badge">!</span>
+    </div>
+
   </div>
 </template>
 
@@ -403,10 +394,12 @@ import {
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { jobsApi } from '@/api/jobs'
+import { resumeApi } from '@/api/resume'
+import { learningPlanApi } from '@/api/learningPlan'
 import { useAuthStore } from '@/stores/auth'
 import JobCard from '@/components/JobCard.vue'
 import gsap from 'gsap'
-import { UserFilled } from '@element-plus/icons-vue'; // 确保引入图标
+import { UserFilled } from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
 const hotJobs = ref([])
@@ -439,17 +432,12 @@ const userDataFallback = {
   },
 }
 
-const showProfileGuide = ref(false); // 控制浮层显示
+const isProfileCompleted = ref(!!sessionStorage.getItem('is_profile_completed'))
 
-
-
-
-// 跳转到个人中心的函数
-const goToPersonalCenter = () => {
-  // 注意：请确认你的路由表中个人中心路径是 '/index' 还是 '/personal'
-  // 根据你提供的文件名为 Index.vue，通常对应 '/index'
-  router.push('/profile'); 
-};
+const dismissGuide = () => {
+  isProfileCompleted.value = true
+  sessionStorage.setItem('is_profile_completed', 'true')
+}
 // 计算胜率：个人分 / 岗位要求分 (假设 category 里有要求分)
 const calculateWinRate = (category) => {
   const baseRate = 70; // 基础分
@@ -474,23 +462,70 @@ const currentPage = ref(1)
 const pageDirection = ref('slide-left')
 let autoPlayTimer = null
 
-const skillCompleteness = ref(82); // 来自 PersonalInfo 的同步
-const competitivenessScore = ref(75); // 来自 PersonalInfo 的同步
+const skillCompleteness = ref(82)
+const competitivenessScore = ref(75)
+const dailyTasks = ref([])
+const skillGaps = ref([])
+const shortAgentAdvice = ref('正在获取 Agent 建议...')
 
-// 这里的任务内容应与成长追踪中心 (GrowthTracker) 保持同步
-const dailyTasks = ref([
-  { id: 1, content: 'Java并发编程基础回顾与JUC包入门', completed: false },
-  { id: 2, content: '深入线程池原理与并发容器', completed: false },
-  { id: 3, content: '锁优化与AQS框架解析', completed: false }
-]);
+// 从 resume_analyzer + learning_plan agent 获取数据
+const fetchDashboardData = async () => {
+  try {
+    const [resumeRes, planRes] = await Promise.all([
+      resumeApi.analyze({}),
+      learningPlanApi.generate({ plan_type: '长期' }),
+    ])
+    // 竞争力评分 & 技能完整度
+    const rData = resumeRes.data
+    if (rData.competitiveness) {
+      const score = rData.competitiveness.score || rData.competitiveness
+      competitivenessScore.value = typeof score === 'number' && score <= 1
+        ? Math.round(score * 100)
+        : Math.round(score)
+    }
+    if (rData.completeness_flags) {
+      const flags = rData.completeness_flags
+      const total = Object.keys(flags).length || 7
+      const filled = Object.values(flags).filter(Boolean).length
+      skillCompleteness.value = Math.round((filled / total) * 100)
+    }
+    // 能力缺口
+    if (rData.skill_analysis) {
+      const s = rData.skill_analysis
+      const gaps = []
+      Object.entries(s).forEach(([key, val]) => {
+        const score = typeof val === 'number' ? val : 75
+        if (score < 80) {
+          gaps.push({
+            name: key,
+            status: score < 50 ? '缺失' : score < 70 ? '尚浅' : '待加强',
+            level: score < 50 ? 'danger' : score < 70 ? 'warning' : 'info',
+            percent: score,
+            color: score < 50 ? '#f56c6c' : score < 70 ? '#e6a23c' : '#409eff',
+          })
+        }
+      })
+      if (gaps.length > 0) skillGaps.value = gaps.slice(0, 4)
+    }
 
-const skillGaps = ref([
-  { name: '工程化架构', status: '缺失', level: 'danger', percent: 25, color: '#f56c6c' },
-  { name: 'TypeScript 高级用法', status: '尚浅', level: 'warning', percent: 50, color: '#e6a23c' },
-  { name: 'Node.js 服务端', status: '待加强', level: 'info', percent: 75, color: '#409eff' }
-]);
-
-const shortAgentAdvice = "系统检测到你的‘工程化架构’能力与目标岗位存在较大偏差。建议本周优先完成 Agent 在成长中心为你分配的 Docker 基础任务，预计可提升核心匹配度 8%。";
+    // 每日待办 & Agent 建议
+    const pData = planRes.data
+    if (pData.daily_tasks) {
+      dailyTasks.value = pData.daily_tasks.slice(0, 4).map((t, i) => ({
+        id: t.id || i + 1,
+        content: t.content || t.title || t.task,
+        completed: false,
+      }))
+    }
+    if (pData.learning_plan?.agent_advice) {
+      shortAgentAdvice.value = pData.learning_plan.agent_advice
+    } else if (pData.learning_plan?.summary) {
+      shortAgentAdvice.value = pData.learning_plan.summary
+    }
+  } catch {
+    // 静默降级，使用默认值
+  }
+}
 
 // 🌟 新增：层级切换逻辑
 const isFrontPage = ref(true)
@@ -905,23 +940,13 @@ const goToProfile = () => router.push('/profile/info')
 // 生命周期
 onMounted(() => {
   loadHotJobs()
+  fetchDashboardData()
   window.addEventListener('resize', handleResize)
 })
 
 onMounted(() => {
-  // 检查 sessionStorage 是否有标记
-  const isCompleted = sessionStorage.getItem('is_profile_completed');
-  
-  if (!isCompleted) {
-    // 如果没填过，显示浮层
-    showProfileGuide.value = true;
-  } else {
-    showProfileGuide.value = false;
-    // 如果填过了，执行原有的打字机等动画
-    startTyping();
-  }
-
-});
+  // 打字机动画已在第一个 onMounted 中启动
+})
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
@@ -957,53 +982,93 @@ const handleResize = () => {
   line-height: 1.3;
 }
 
-/* 强制引导浮层样式 */
-.force-guide-overlay {
+/* 悬浮球：提醒完善个人信息 */
+.floating-profile-ball {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20px); /* 极高模糊，符合高级简约感 */
-  z-index: 10000;
+  bottom: 40px;
+  right: 40px;
+  z-index: 9999;
   display: flex;
-  justify-content: center;
   align-items: center;
+  gap: 8px;
+  padding: 14px 20px 14px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: ballPulse 2s ease-in-out infinite;
+
+  &:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.5);
+    animation: none;
+  }
+
+  .ball-close {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid #fff;
+    color: #fff;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  .ball-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ball-text {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .ball-badge {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 20px;
+    height: 20px;
+    background: #ff4757;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    animation: badgeBounce 1.5s ease-in-out infinite;
+  }
 }
 
-.guide-glass-card {
-  width: 380px;
-  padding: 50px 40px;
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
-  text-align: center;
+@keyframes ballPulse {
+  0%, 100% { box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4); }
+  50% { box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4), 0 0 0 8px rgba(102, 126, 234, 0.15); }
 }
 
-.guide-title {
-  font-size: 24px;
-  color: #2d3436;
-  margin: 20px 0 10px;
-}
-
-.guide-desc {
-  color: #636e72;
-  margin-bottom: 30px;
-  line-height: 1.6;
-}
-
-.guide-enter-btn {
-  width: 100%;
-  height: 45px;
-  border-radius: 10px;
-  background: #000; /* 黑色系，简约高级 */
-  border: none;
-}
-
-.blur-bg {
-  filter: blur(10px);
-  pointer-events: none; /* 锁定背景不可点击 */
+@keyframes badgeBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
 }
 
 // ========== 1. 顶部区域 (修正了布局与层级) ==========

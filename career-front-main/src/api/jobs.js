@@ -10,4 +10,7 @@ export const jobsApi = {
   search(q, params = {}) {
     return api.get('/jobs/search', { params: { q, ...params } })
   },
+  hot() {
+    return api.get('/jobs/hot')
+  },
 }
