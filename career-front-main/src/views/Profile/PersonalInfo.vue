@@ -91,8 +91,9 @@
 import { ref, onMounted, onUnmounted, defineProps, defineEmits, nextTick } from 'vue'
 import { School, Message, MagicStick } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { resumeApi } from '@/api/resume'
 import { ElMessage } from 'element-plus'
+import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
+import { careerPlanApi } from '@/api/careerPlan'
 
 const props = defineProps(['userInfo'])
 const emit = defineEmits(['re-edit'])
@@ -108,66 +109,83 @@ let wordCloudInstance = null
 
 const avatarUrl = 'https://ui-avatars.com/api/?name=User&background=ebf5ff&color=70a1ff'
 
-// 调用 resume_analyzer agent
-const skillAnalysis = ref(null)
+const DIM_NAMES = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
 const analysisReport = ref('')
-const skillRadarData = ref([85, 90, 95, 95, 80, 85, 60])
-const wordCloudData = ref([
-  { name: '数据结构与算法', value: 80 }, { name: 'Java', value: 60 },
-  { name: '自主学习', value: 65 }, { name: '团队统筹', value: 70 },
-  { name: '软件开发', value: 55 }, { name: '跨部门协作', value: 55 }
-])
+const skillRadarData = ref([0, 0, 0, 0, 0, 0, 0])
+const wordCloudData = ref([])
+const displayPercentage = ref(0)
 
-const fetchAnalysis = async () => {
-  try {
-    const { data } = await resumeApi.analyze({})
-    if (data.competitiveness) {
-      competitivenessScore.value = data.competitiveness.score || data.competitiveness
-      if (typeof competitivenessScore.value === 'number' && competitivenessScore.value <= 1) {
-        competitivenessScore.value = Math.round(competitivenessScore.value * 100)
-      }
-    }
-    // 7维能力评分映射到雷达图: 专业技能, 创新能力, 学习能力, 实习能力, 抗压能力, 沟通能力, 证书
-    if (data.skill_analysis) {
-      skillAnalysis.value = data.skill_analysis
-      const s = data.skill_analysis
-      skillRadarData.value = [
-        s.professional || s['专业技能'] || 85,
-        s.innovation || s['创新能力'] || 90,
-        s.learning || s['学习能力'] || 95,
-        s.internship || s['实习能力'] || 95,
-        s.pressure || s['抗压能力'] || 80,
-        s.communication || s['沟通能力'] || 85,
-        s.certificate || s['证书'] || 60,
-      ]
-    }
-    if (data.completeness_flags) {
-      const flags = data.completeness_flags
-      const total = Object.keys(flags).length || 7
-      const filled = Object.values(flags).filter(Boolean).length
-      displayPercentage.value = Math.round((filled / total) * 100)
-    }
-    if (data.report) {
-      analysisReport.value = data.report
-    }
-    // 词云数据
-    if (data.skill_analysis) {
-      const s = data.skill_analysis
-      wordCloudData.value = [
-        { name: '专业技能', value: s.professional || s['专业技能'] || 85 },
-        { name: '创新能力', value: s.innovation || s['创新能力'] || 90 },
-        { name: '学习能力', value: s.learning || s['学习能力'] || 95 },
-        { name: '实习能力', value: s.internship || s['实习能力'] || 95 },
-        { name: '抗压能力', value: s.pressure || s['抗压能力'] || 80 },
-        { name: '沟通能力', value: s.communication || s['沟通能力'] || 85 },
-        { name: '证书', value: s.certificate || s['证书'] || 60 },
-      ]
-    }
-  } catch {
-    ElMessage.warning('获取分析报告失败，显示默认数据')
-  } finally {
-    loading.value = false
+const buildFromProfileData = async () => {
+  const radar = currentRadarData.value
+  const details = dimensionDetailsRaw.value
+
+  // 雷达图数据直接来自画像分析
+  if (radar && radar.some(v => v > 0)) {
+    skillRadarData.value = [...radar]
   }
+
+  // 综合评分 = 7维加权平均
+  const weights = [0.20, 0.12, 0.15, 0.18, 0.10, 0.10, 0.15]
+  let totalScore = 0, totalWeight = 0
+  DIM_NAMES.forEach((dim, i) => {
+    const score = details?.[dim]?.score || radar?.[i] || 0
+    if (score > 0) { totalScore += score * weights[i]; totalWeight += weights[i] }
+  })
+  competitivenessScore.value = totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0
+
+  // 完善度
+  if (details) {
+    const analyzed = Object.values(details).filter(d => d.status === '已分析').length
+    displayPercentage.value = Math.round((analyzed / 7) * 100)
+  }
+
+  // 词云数据
+  wordCloudData.value = DIM_NAMES.map((dim, i) => ({
+    name: dim,
+    value: details?.[dim]?.score || radar?.[i] || 0,
+  })).filter(d => d.value > 0)
+
+  // AI 诊断报告 — 调用 career_planner 智能体，综合画像分析输出
+  try {
+    const { data: wrapper } = await careerPlanApi.generate()
+    const plan = wrapper?.data || wrapper
+    const topJob = plan?.top_job || {}
+    const trends = plan?.trends || {}
+    const careerPath = plan?.career_path || {}
+
+    const strong = DIM_NAMES.filter(d => (details?.[d]?.score || 0) >= 60)
+    const weak = DIM_NAMES.filter(d => { const s = details?.[d]?.score || 0; return s > 0 && s < 40 })
+    const pending = DIM_NAMES.filter(d => !details?.[d] || details[d].score === 0)
+
+    let report = ''
+    // 画像分析摘要
+    if (strong.length) report += `优势维度：${strong.join('、')}。`
+    if (weak.length) report += `待提升：${weak.join('、')}。`
+    if (pending.length) report += `未采集：${pending.join('、')}。`
+    // 职业规划信息
+    if (topJob.job_name) report += `\n目标岗位：${topJob.job_name}`
+    if (topJob.match_score) report += `，匹配度${Math.round(topJob.match_score * 100)}分。`
+    if (trends.salary_forecast?.length) {
+      const latest = trends.salary_forecast[trends.salary_forecast.length - 1]
+      report += `\n薪资预测：${latest.year}年预计月薪${latest.value}k。`
+    }
+    if (careerPath?.suggestion) report += `\n职业建议：${careerPath.suggestion}`
+    if (!report) report = '请在职能助手中提供更多个人信息以生成诊断报告。'
+    analysisReport.value = report
+  } catch {
+    // career_planner 调用失败时，用画像数据生成基础报告
+    const strong = DIM_NAMES.filter(d => (details?.[d]?.score || 0) >= 60)
+    const weak = DIM_NAMES.filter(d => { const s = details?.[d]?.score || 0; return s > 0 && s < 40 })
+    const pending = DIM_NAMES.filter(d => !details?.[d] || details[d].score === 0)
+    let report = ''
+    if (strong.length) report += `优势维度：${strong.join('、')}。`
+    if (weak.length) report += `待提升：${weak.join('、')}。`
+    if (pending.length) report += `未采集：${pending.join('、')}。`
+    if (!report) report = '请在职能助手中提供更多个人信息以生成诊断报告。'
+    analysisReport.value = report
+  }
+
+  loading.value = false
 }
 
 // 🌟 3. 补全缺失的适配函数
@@ -177,9 +195,8 @@ const handleResize = () => {
 }
 
 onMounted(async () => {
-  await fetchAnalysis()
+  await buildFromProfileData()
   await nextTick()
-
   setTimeout(() => {
     initRadarChart()
     initWordCloud()
@@ -193,8 +210,6 @@ onUnmounted(() => {
   radarInstance?.dispose()
   wordCloudInstance?.dispose()
 })
-
-const displayPercentage = ref(0)
 
 const initRadarChart = () => {
   if (!radarRef.value) return

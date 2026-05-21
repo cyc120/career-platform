@@ -1,4 +1,6 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -36,6 +38,40 @@ class CoachRequest(BaseModel):
     history: List[dict] = []  # [{role: "user"|"assistant", content: str}]
     previous_radar_data: List[int] = []
     previous_details: Optional[dict] = None
+
+
+class ParseFileRequest(BaseModel):
+    filename: str
+    base64: str
+
+
+@router.post("/parse-file")
+async def parse_file(req: ParseFileRequest, user: dict = Depends(get_current_user)):
+    """Parse uploaded file (PDF/DOC) and extract text content."""
+    import base64
+    import io
+    ext = req.filename.rsplit('.', 1)[-1].lower() if '.' in req.filename else ''
+
+    try:
+        file_bytes = base64.b64decode(req.base64)
+    except Exception:
+        raise HTTPException(400, "Invalid base64 data")
+
+    if ext == 'pdf':
+        try:
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                pages = [page.extract_text() or '' for page in pdf.pages]
+            return {"success": True, "text": "\n".join(pages)}
+        except ImportError:
+            raise HTTPException(500, "pdfplumber not installed")
+        except Exception as e:
+            raise HTTPException(400, f"PDF 解析失败: {str(e)}")
+
+    if ext == 'doc':
+        return {"success": False, "error": "暂不支持 .doc 格式，请转换为 .docx 后重新上传"}
+
+    return {"success": False, "error": f"不支持的格式: .{ext}"}
 
 
 @router.post("/generate")
@@ -165,6 +201,94 @@ async def career_coach(req: CoachRequest, user: dict = Depends(get_current_user)
         "radar_data": radar_data,
         "dimension_details": dimension_details,
     }
+
+
+@router.post("/coach/stream")
+async def coach_stream(req: CoachRequest, user: dict = Depends(get_current_user)):
+    """Streaming SSE endpoint for career coaching chat."""
+    prev_details = req.previous_details or {}
+    DIM_ORDER = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
+    filled = [d for d in DIM_ORDER if prev_details.get(d, {}).get("status") == "已分析"]
+    gaps = [d for d in DIM_ORDER if d not in filled]
+    gap_hint = ""
+    if gaps:
+        gap_hint = f"用户尚未提供：{'、'.join(gaps)}。请在回复末尾用一句话自然地引导用户补充其中一项。"
+    else:
+        gap_hint = "用户画像已较完善，可以给出总结性建议或深度追问。"
+
+    COACH_SYSTEM_PROMPT = (
+        "你是「职途无限」AI职业教练，专注于计算机/IT方向求职辅导。"
+        "你熟悉的技术栈包括：前后端开发、算法、大数据、人工智能、网络安全、运维等方向。\n"
+        "规则：\n"
+        "1. 回复不超过80字，禁止markdown符号，纯文本\n"
+        "2. 先回应用户内容，再自然追问，不列点\n"
+        "3. 每次只追问一个方向，优先补充画像缺口\n"
+        f"4. {gap_hint}\n"
+        "5. 提问要具体到技术方向，比如：你用过什么框架？参加过ACM吗？有实习经历吗？\n"
+        "6. 语气像学长聊天，简短直接"
+    )
+
+    llm = get_llm(temperature=0.7, max_tokens=200)
+
+    messages = [SystemMessage(content=COACH_SYSTEM_PROMPT)]
+    for h in req.history[-10:]:
+        role = h.get("role", "user")
+        content = h.get("content", "")
+        if role == "user":
+            messages.append(HumanMessage(content=content))
+        elif role == "assistant":
+            messages.append(AIMessage(content=content))
+    messages.append(HumanMessage(content=req.message))
+
+    async def event_stream():
+        full_reply = ""
+
+        # Stream LLM tokens
+        async for chunk in llm.astream(messages):
+            token = chunk.content
+            if token:
+                full_reply += token
+                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+
+        # Run profile analyzer after stream completes
+        full_history = list(req.history) + [
+            {"role": "user", "content": req.message},
+            {"role": "assistant", "content": full_reply},
+        ]
+        radar_data = [0, 0, 0, 0, 0, 0, 0]
+        dimension_details = {}
+        try:
+            result = await harness.run(
+                "profile_analyzer",
+                {
+                    "chat_history": full_history,
+                    "previous_radar_data": req.previous_radar_data,
+                    "previous_details": req.previous_details or {},
+                },
+                user_id=user["user_id"],
+            )
+            if result.get("success") and result.get("data"):
+                radar_data = result["data"].get("radar_data", radar_data)
+                dimension_details = result["data"].get("dimension_details", dimension_details)
+        except Exception as e:
+            import traceback
+            print(f"[Coach] Profile analyzer error: {e}")
+            traceback.print_exc()
+
+        radar_payload = json.dumps({'type': 'radar', 'radar_data': radar_data, 'dimension_details': dimension_details}, ensure_ascii=False)
+        print(f"[Coach] Sending radar event: {radar_payload[:200]}")
+        yield f"data: {radar_payload}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/tasks")

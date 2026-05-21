@@ -12,6 +12,58 @@ SMOOTH_ALPHA = 0.6
 SCORE_THRESHOLD = 1
 
 # ============================================================
+# 维度关联推断 — 高分维度自动提升关联的低分维度
+# ============================================================
+# (来源维度, 目标维度, 提升比例, 提升上限)
+CORRELATIONS = [
+    ("实习能力", "专业技能", 0.25, 20),  # 实习→技能：实战提升技术
+    ("实习能力", "抗压能力", 0.25, 20),  # 实习→抗压：职场deadline和多任务
+    ("实习能力", "沟通能力", 0.15, 10),  # 实习→沟通：职场协作
+    ("创新能力", "专业技能", 0.20, 15),  # 创新→技能：技术突破需要扎实基础
+    ("创新能力", "学习能力", 0.20, 15),  # 创新→学习：探索新领域
+    ("创新能力", "抗压能力", 0.25, 20),  # 创新→抗压：竞赛/论文/项目高压
+    ("学习能力", "抗压能力", 0.15, 10),  # 学习→抗压：学业压力、持续学习
+    ("沟通能力", "抗压能力", 0.10, 10),  # 沟通→抗压：团队协调有压力
+    ("专业技能", "抗压能力", 0.10, 10),  # 技能→抗压：技术栈越多项目越多
+]
+
+
+def _apply_correlation_boosts(scores: dict) -> dict:
+    """根据维度间的逻辑关联，对低分维度做合理提升。
+
+    多个来源维度的提升可以累加（如实习+竞赛+学习共同提升抗压能力），
+    总提升上限为最高来源分数的40%。
+    """
+    boosts = {}  # dim -> accumulated boost
+
+    for src_dim, tgt_dim, ratio, cap in CORRELATIONS:
+        src_score = scores.get(src_dim, {}).get("score", 0)
+        tgt_score = scores.get(tgt_dim, {}).get("score", 0)
+        if src_score > 20 and tgt_score < src_score:
+            boost = min(int(src_score * ratio), cap)
+            max_allowed = src_score - tgt_score
+            actual_boost = min(boost, max(max_allowed, 0))
+            if actual_boost > 0:
+                # 累加各来源的提升（多维度共同影响）
+                boosts[tgt_dim] = boosts.get(tgt_dim, 0) + actual_boost
+
+    # 总提升上限：不超过当前最高来源分数的40%
+    for dim, total_boost in boosts.items():
+        if dim in scores:
+            max_src = max(
+                (scores.get(s, {}).get("score", 0) for s, t, _, _ in CORRELATIONS if t == dim),
+                default=0,
+            )
+            capped_boost = min(total_boost, int(max_src * 0.4))
+            old_score = scores[dim]["score"]
+            scores[dim]["score"] = min(old_score + capped_boost, 100)
+            if scores[dim]["status"] != "已分析":
+                scores[dim]["status"] = "已分析"
+                scores[dim]["desc"] = "根据关联维度推断"
+
+    return scores
+
+# ============================================================
 # 证书评分体系 — 按领域分组，同领域取最高，跨领域累加
 # ============================================================
 # 每个关键词 → (分数, 领域)
@@ -197,6 +249,9 @@ async def format_output(state: ProfileAnalyzerState) -> dict:
     # 只扫描用户消息，避免AI回复中提到的证书被误算
     user_text = " ".join(m.get("content", "") for m in chat_history if m.get("role") == "user")
     cert_score, cert_names = _score_certificates(user_text)
+
+    # 维度关联推断：高分维度自动提升关联的低分维度
+    scores = _apply_correlation_boosts(dict(scores))
 
     radar_data = []
     dimension_details = {}
