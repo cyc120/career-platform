@@ -1,0 +1,168 @@
+{
+  "hardware_test_promotion_routes": [
+    {
+      "id": 1,
+      "route_type": "technical",
+      "level": 1,
+      "title": "初级硬件测试工程师",
+      "experience_range": "0-2年",
+      "core_abilities": "硬件基础（电阻/电容/芯片）、测试仪器使用（万用表、示波器）、测试用例编写、基础功能测试、缺陷记录与跟踪、测试报告撰写",
+      "key_responsibilities": "协助完成硬件产品功能测试、执行测试用例、记录测试缺陷、整理测试数据、配合研发修复问题、编写基础测试报告",
+      "salary_range_first_tier": "8k-17k/月"
+    },
+    {
+      "id": 2,
+      "route_type": "technical",
+      "level": 2,
+      "title": "中级硬件测试工程师",
+      "experience_range": "2-5年",
+      "core_abilities": "硬件原理精通、测试方案设计、复杂仪器操作（频谱仪、信号发生器）、可靠性测试、电磁兼容（EMC）基础、缺陷分析与定位",
+      "key_responsibilities": "独立负责硬件产品测试方案设计、编写详细测试用例、执行可靠性/EMC测试、分析测试缺陷根源、优化测试流程、输出完整测试报告",
+      "salary_range_first_tier": "17k-30k/月"
+    },
+    {
+      "id": 3,
+      "route_type": "technical",
+      "level": 3,
+      "title": "高级硬件测试工程师/测试主管",
+      "experience_range": "5-8年",
+      "core_abilities": "测试体系搭建、硬件性能测试、故障诊断与排查、测试自动化、测试策略制定、跨部门技术协同、测试团队指导",
+      "key_responsibilities": "主导硬件测试体系搭建、制定测试策略与规范、负责核心产品测试统筹、排查复杂测试缺陷、指导初级/中级测试工程师、推动测试自动化落地",
+      "salary_range_first_tier": "30k-48k/月"
+    },
+    {
+      "id": 4,
+      "route_type": "technical",
+      "level": 4,
+      "title": "硬件测试架构师/资深专家",
+      "experience_range": "8-12年+",
+      "core_abilities": "硬件测试架构设计、测试自动化平台搭建、前沿测试技术研究、跨领域测试方案（车载/工业/消费电子）、测试技术创新、行业技术洞察",
+      "key_responsibilities": "规划硬件测试技术路线、搭建测试自动化平台、制定企业级测试标准、解决顶级测试难题、推动测试技术迭代、赋能整个测试团队",
+      "salary_range_first_tier": "48k-78k+/月"
+    },
+    {
+      "id": 5,
+      "route_type": "technical",
+      "level": 5,
+      "title": "首席硬件测试专家/技术Fellow",
+      "experience_range": "12年+",
+      "core_abilities": "行业测试技术趋势洞察、核心测试技术壁垒构建、测试战略制定、跨领域技术融合、测试团队体系搭建、产学研合作",
+      "key_responsibilities": "制定公司硬件测试整体技术战略、主导核心测试技术研发、参与商业决策、推动测试技术产业化、培养顶尖硬件测试人才",
+      "salary_range_first_tier": "78k+/月"
+    },
+    {
+      "id": 6,
+      "route_type": "management",
+      "level": 1,
+      "title": "硬件测试组长/Team Leader",
+      "experience_range": "3-5年",
+      "core_abilities": "硬件测试技术+任务拆解、进度管控、测试团队协调、需求对接、测试质量把控",
+      "key_responsibilities": "管理3-5人测试小组、分配测试任务、把控测试进度与质量、协调研发/产品对接、组织代码/测试用例评审",
+      "salary_range_first_tier": "21k-35k/月"
+    },
+    {
+      "id": 7,
+      "route_type": "management",
+      "level": 2,
+      "title": "硬件测试经理/研发测试经理",
+      "experience_range": "5-8年",
+      "core_abilities": "项目管理、跨部门协作、资源协调、测试团队建设、研发流程优化、测试成本管控",
+      "key_responsibilities": "管理10-20人硬件测试团队、负责测试业务线交付、制定测试研发规范、培养测试人才、把控项目测试风险、优化测试资源配置",
+      "salary_range_first_tier": "35k-58k/月"
+    },
+    {
+      "id": 8,
+      "route_type": "management",
+      "level": 3,
+      "title": "硬件测试总监/部门负责人",
+      "experience_range": "8-12年+",
+      "core_abilities": "测试技术战略落地、团队体系搭建、成本与效率管控、测试平台化建设、跨领域协同",
+      "key_responsibilities": "负责硬件测试部门整体规划、搭建测试技术体系、统筹重大项目测试交付、打造测试人才梯队、推动测试与业务深度融合",
+      "salary_range_first_tier": "58k-88k+/月"
+    },
+    {
+      "id": 9,
+      "route_type": "management",
+      "level": 4,
+      "title": "CTO/技术VP",
+      "experience_range": "12年+",
+      "core_abilities": "商业视野、行业技术趋势、硬件全流程认知、核心团队搭建、投融资对接",
+      "key_responsibilities": "公司整体技术战略、硬件产品技术方向、核心团队管理、推动硬件技术与业务深度融合、把控产品质量与研发效率",
+      "salary_range_first_tier": "88k+/月+股权"
+    }
+  ],
+  "hardware_test_transfer_routes": [
+    {
+      "id": 1,
+      "transfer_type": "technical_cross",
+      "post_name": "硬件研发工程师",
+      "core_skills_required": "硬件测试基础 + 电路设计（Altium Designer）+ 芯片选型 + PCB设计 + 硬件调试",
+      "transfer_path": "硬件测试→学习电路设计基础→掌握PCB设计工具→硬件调试实战→独立完成简单硬件研发",
+      "advantages": "技术转型平滑、薪资涨幅明显、职业发展空间广、懂测试更易设计出高可靠性产品",
+      "demand": "高"
+    },
+    {
+      "id": 2,
+      "transfer_type": "technical_cross",
+      "post_name": "可靠性测试工程师",
+      "core_skills_required": "硬件测试基础 + 可靠性测试标准（IEC/GB）+ 环境测试（高低温/湿热）+ 寿命测试 + 失效分析",
+      "transfer_path": "硬件测试→学习可靠性测试标准→掌握环境测试仪器→失效分析实战→专项可靠性测试",
+      "advantages": "技术壁垒高、越老越吃香、35岁风险低、行业需求稳定",
+      "demand": "极高"
+    },
+    {
+      "id": 3,
+      "transfer_type": "technical_cross",
+      "post_name": "EMC测试工程师",
+      "core_skills_required": "硬件测试基础 + EMC测试标准 + 电磁兼容原理 + 屏蔽设计 + EMC整改",
+      "transfer_path": "硬件测试→学习EMC测试标准→掌握EMC测试仪器→EMC整改实战→专项EMC测试与优化",
+      "advantages": "稀缺性强、薪资顶尖、大厂核心岗、技术深度高",
+      "demand": "中高"
+    },
+    {
+      "id": 4,
+      "transfer_type": "technical_cross",
+      "post_name": "测试自动化工程师（硬件方向）",
+      "core_skills_required": "硬件测试基础 + 单片机/PLC + 测试脚本编写（Python）+ 自动化测试平台搭建 + 仪器远程控制",
+      "transfer_path": "硬件测试→学习Python编程→掌握单片机/PLC基础→自动化脚本开发→搭建硬件自动化测试平台",
+      "advantages": "技术竞争力强、不可替代性高、薪资溢价明显、工作效率提升显著",
+      "demand": "高"
+    },
+    {
+      "id": 5,
+      "transfer_type": "technical_cross",
+      "post_name": "硬件质量工程师（QE）",
+      "core_skills_required": "硬件测试基础 + 质量体系（ISO9001/IATF16949）+ 制程质量管控 + 供应商质量审核 + 缺陷预防",
+      "transfer_path": "硬件测试→学习质量体系标准→掌握制程质量管控方法→供应商审核实战→质量体系落地",
+      "advantages": "稳定性高、跨部门话语权强、职业寿命长、适配多行业",
+      "demand": "高"
+    },
+    {
+      "id": 6,
+      "transfer_type": "business_cross",
+      "post_name": "技术产品经理（硬件方向）",
+      "core_skills_required": "硬件测试技术 + 需求分析 + 产品思维 + 硬件产品设计 + 用户体验",
+      "transfer_path": "硬件测试→学习产品工具（Axure）→业务分析→硬件产品需求梳理→硬件产品设计落地",
+      "advantages": "懂硬件技术、与研发/测试沟通高效、逻辑清晰、适配硬件类产品/测试工具产品",
+      "demand": "中高"
+    },
+    {
+      "id": 7,
+      "transfer_type": "industry_cross",
+      "post_name": "车载硬件测试工程师",
+      "core_skills_required": "硬件测试基础 + 车载硬件知识（MCU/传感器）+ 车载测试标准（ISO26262）+ 车载环境测试",
+      "transfer_path": "硬件测试→学习车载硬件知识→掌握车载测试标准→车载硬件测试实战→车载测试优化",
+      "advantages": "自动驾驶风口、薪资极高、行业需求稳定、技术壁垒高",
+      "demand": "极高"
+    },
+    {
+      "id": 8,
+      "transfer_type": "industry_cross",
+      "post_name": "工业硬件测试工程师",
+      "core_skills_required": "硬件测试基础 + 工业控制硬件（PLC/变频器）+ 工业测试标准 + 高低温/振动测试 + 工业环境适配",
+      "transfer_path": "硬件测试→学习工业控制硬件知识→掌握工业测试标准→工业硬件测试实战→工业场景适配优化",
+      "advantages": "行业稳定性强、薪资高、技术复用性强、需求持续旺盛",
+      "demand": "高"
+    }
+  ]
+}

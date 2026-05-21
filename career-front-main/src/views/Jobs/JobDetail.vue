@@ -50,8 +50,7 @@
           </el-empty>
         </div>
         <div v-else class="description">
-          <p>{{ job.description || '暂无详细描述' }}</p>
-          
+          <p>{{ formatDescription(job.description) || '暂无详细描述' }}</p>
           <img src="@/assets/3D programmer.png" class="card-decoration" />
         </div>
       </el-card>
@@ -355,6 +354,11 @@ const goBack = () => {
   router.back()
 }
 
+const formatDescription = (desc) => {
+  if (!desc) return ''
+  return desc.replace(/；/g, '\n').replace(/\\n/g, '\n')
+}
+
 
 
 // 2. 修改点击收藏的逻辑
@@ -598,11 +602,9 @@ onBeforeUnmount(() => {
 /* --- 统一后的根容器样式 --- */
 .job-detail {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  /* 💡 你的三色渐变背景 */
+  /* 不限制总高度，让内容自然撑开页面滚动 */
   background: linear-gradient(
-    135deg, 
+    135deg,
     #faf9ed 0%,    /* 浅蓝灰 */
     #e8eef9 50%,   /* 淡紫色 */
     #f3e5f55a 100%   /* 浅藕荷色 */
@@ -683,17 +685,16 @@ onBeforeUnmount(() => {
     }
   }
 }
-/* --- 2. 主体内容区：取消宽度限制 --- */
+/* --- 2. 主体内容区：取消高度限制，让内容自然撑开 --- */
 .main-content {
-  flex: 1;
   padding: 0px 30px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  /* 确保在大屏幕下内容也不会缩在一起 */
-  width: 100%; 
+  width: 100%;
   box-sizing: border-box;
   margin-top: 3px;
+  /* 关键：不设 flex:1，让所有卡片按内容高度完整展开，页面整体滚动 */
 }
 
 /* --- 统一卡片基础美化 --- */
@@ -774,17 +775,34 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 1. 确保卡片是相对定位的基准 */
+/* 1. 岗位介绍卡片：完整展示，不裁剪内容 */
 .intro-card {
   position: relative;
-  overflow: hidden; /* 裁剪掉超出圆角的部分 */
+  overflow: visible !important;
+  min-height: auto;
+  :deep(.el-card__body) {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 25px 30px !important;
+  }
 }
 
-/* 2. 调整文字层级，确保不被图片完全盖住 */
+/* 2. 岗位介绍文字：完整显示，自动换行 */
 .description {
   position: relative;
   z-index: 2;
-  padding-right: 60px; /* 给右侧留出呼吸空间 */
+  padding-right: 40px;
+  font-size: 15px;
+  line-height: 2;
+  color: #444;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  p {
+    white-space: pre-wrap;
+    margin: 0;
+  }
 }
 
 /* 3. 图片的绝对定位样式 */
@@ -888,13 +906,6 @@ onBeforeUnmount(() => {
 }
 
 /* --- 5. 列表样式：打钩图标与间距 --- */
-.description {
-  line-height: 1.8;
-  color: #444;
-  font-size: 16px;
-  white-space: pre-line;
-}
-
 .requirements ul {
   list-style: none;
   padding: 0;

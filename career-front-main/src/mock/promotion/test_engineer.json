@@ -1,0 +1,168 @@
+{
+  "test_engineer_promotion_routes": [
+    {
+      "id": 1,
+      "route_type": "technical",
+      "level": 1,
+      "title": "初级测试工程师（入门）",
+      "experience_range": "0-2年（应届生可投）",
+      "core_abilities": "熟悉软件测试基础理论、掌握测试用例设计方法、会使用缺陷管理工具（Jira/禅道）、能执行基础功能测试、了解接口测试基础、具备简单问题定位与反馈能力、熟悉基础办公软件",
+      "key_responsibilities": "协助完成测试任务，执行功能测试用例，提交并跟踪缺陷，整理测试数据与报告，参与版本回归测试，协助搭建测试环境，收集产品问题反馈，学习自动化/性能测试基础工具",
+      "salary_range_first_tier": "7k-15k/月"
+    },
+    {
+      "id": 2,
+      "route_type": "technical",
+      "level": 2,
+      "title": "中级测试工程师（进阶）",
+      "experience_range": "2-5年",
+      "core_abilities": "独立设计测试方案与用例、熟练进行接口测试（Postman/Jmeter）、掌握基础自动化测试（Selenium/Appium）、具备数据库操作能力（MySQL）、能分析复杂业务逻辑、定位常见前后端问题、熟悉项目流程与提测规范",
+      "key_responsibilities": "独立负责模块/项目测试，编写测试计划与方案，执行接口/功能/兼容性测试，使用自动化脚本提升效率，推动问题闭环，输出测试报告，参与需求评审，对接开发定位缺陷",
+      "salary_range_first_tier": "15k-28k/月（含测试绩效）"
+    },
+    {
+      "id": 3,
+      "route_type": "technical",
+      "level": 3,
+      "title": "高级测试工程师（资深）",
+      "experience_range": "5-8年",
+      "core_abilities": "精通全链路测试、熟练搭建自动化测试框架、掌握性能测试与压力测试、具备安全测试基础、能主导复杂项目质量保障、具备代码阅读能力、熟悉CI/CD流程、指导初级测试人员",
+      "key_responsibilities": "主导项目整体测试策略，搭建自动化/性能测试体系，负责核心模块深度测试，推动质量流程优化，解决线上疑难问题，制定测试规范，提升团队测试效率",
+      "salary_range_first_tier": "28k-45k/月（含绩效+项目奖金）"
+    },
+    {
+      "id": 4,
+      "route_type": "technical",
+      "level": 4,
+      "title": "测试专家/测试架构师",
+      "experience_range": "8-12年+",
+      "core_abilities": "具备全栈质量保障能力、设计企业级测试平台、精通自动化/性能/安全专项测试、推动质量左移、熟悉微服务/云原生测试体系、具备技术方案评审能力、制定质量管控体系",
+      "key_responsibilities": "搭建公司级测试技术体系，主导测试平台与工具开发，制定质量标准，解决顶级技术难题，推动测试智能化与自动化，赋能团队技术成长，参与架构设计评审",
+      "salary_range_first_tier": "45k-70k+/月（含绩效+项目分红）"
+    },
+    {
+      "id": 5,
+      "route_type": "technical",
+      "level": 5,
+      "title": "首席测试专家/质量负责人",
+      "experience_range": "12年+",
+      "core_abilities": "具备行业质量视野、制定整体质量战略、构建全流程质量管控体系、推动质量文化建设、整合测试技术栈、熟悉行业质量标准与合规要求、搭建顶尖质量团队",
+      "key_responsibilities": "制定公司质量战略与发展规划，统筹全产品线质量保障，推动质量体系落地，参与重大技术决策，构建质量壁垒，提升公司整体产品质量竞争力",
+      "salary_range_first_tier": "70k+/月+股权+项目分红"
+    },
+    {
+      "id": 6,
+      "route_type": "management",
+      "level": 1,
+      "title": "测试组长/Team Leader",
+      "experience_range": "3-5年",
+      "core_abilities": "测试技术+任务拆解、测试进度管控、小组团队协调、跨部门对接、测试质量把控、测试流程优化、基础团队管理、风险识别与控制",
+      "key_responsibilities": "管理3-5人测试小组，分配测试任务，把控进度与质量，协调开发/产品/设计，组织用例评审与复盘，指导初级测试，推动测试效率提升，保障版本按时发布",
+      "salary_range_first_tier": "18k-30k/月（含管理补贴+测试绩效）"
+    },
+    {
+      "id": 7,
+      "route_type": "management",
+      "level": 2,
+      "title": "测试经理/质量经理",
+      "experience_range": "5-8年",
+      "core_abilities": "测试团队管理、项目质量管控、跨部门协同、资源统筹、测试体系建设、成本与风险控制、团队人才培养、流程标准化建设",
+      "key_responsibilities": "管理10-20人测试团队，统筹多项目测试交付，制定团队培养计划，优化质量流程，控制项目风险，推动自动化与工具落地，保障整体产品质量稳定",
+      "salary_range_first_tier": "30k-50k/月（含管理补贴+成果分红）"
+    },
+    {
+      "id": 8,
+      "route_type": "management",
+      "level": 3,
+      "title": "测试总监/质量中心负责人",
+      "experience_range": "8-12年+",
+      "core_abilities": "质量战略规划、测试体系搭建、团队规模化管理、重大项目质量统筹、高端人才引育、行业资源整合、质量合规与风险管控",
+      "key_responsibilities": "负责测试与质量部门整体规划，搭建质量管控体系，统筹重大项目质量保障，搭建人才梯队，推动质量与业务深度融合，对接行业合规要求",
+      "salary_range_first_tier": "50k-80k+/月（含管理补贴+质量专项奖励）"
+    },
+    {
+      "id": 9,
+      "route_type": "management",
+      "level": 4,
+      "title": "质量副总裁/CTO",
+      "experience_range": "12年+",
+      "core_abilities": "商业+技术双重视野、行业技术趋势判断、核心技术团队搭建、整体技术与质量战略、投融资对接、技术生态构建、产品商业化质量保障",
+      "key_responsibilities": "制定公司整体技术与质量战略，管理核心技术团队，统筹产品质量与研发效率，推动技术与业务融合，对接资本与行业资源，提升公司技术品牌与竞争力",
+      "salary_range_first_tier": "80k+/月+股权+专项奖励"
+    }
+  ],
+  "test_engineer_transfer_routes": [
+    {
+      "id": 1,
+      "transfer_type": "technical_cross",
+      "post_name": "自动化测试工程师（专项深化）",
+      "core_skills_required": "测试基础 + Python/Java + 自动化框架（Selenium/Appium/Playwright）+ 接口自动化 + CI/CD集成 + 自动化平台开发",
+      "transfer_path": "功能测试→学习编程→掌握自动化工具→搭建自动化框架→接入CI/CD→持续集成实战→专项深耕",
+      "advantages": "技术壁垒高、薪资溢价明显、需求极大、职业寿命长，是测试转型主流方向",
+      "demand": "极高"
+    },
+    {
+      "id": 2,
+      "transfer_type": "technical_cross",
+      "post_name": "性能测试工程师（专项延伸）",
+      "core_skills_required": "测试基础 + JMeter/LoadRunner + 全链路压测 + 监控工具（Prometheus）+ 服务器性能分析 + 瓶颈定位与调优",
+      "transfer_path": "功能测试→学习压测工具→掌握监控与分析→全链路压测实战→性能调优→专项深耕",
+      "advantages": "稀缺性强、大厂刚需、薪资高，尤其高并发项目需求极大",
+      "demand": "高"
+    },
+    {
+      "id": 3,
+      "transfer_type": "technical_cross",
+      "post_name": "测试开发工程师（高阶方向）",
+      "core_skills_required": "测试理论 + 编程开发 + 测试平台/工具开发 + 持续集成 + 质量平台设计 + 代码能力达标",
+      "transfer_path": "自动化测试→加强编码能力→开发测试工具/平台→对接DevOps→成为测开专家",
+      "advantages": "测试天花板岗位，薪资接近开发，通用性极强，不易被替代",
+      "demand": "极高"
+    },
+    {
+      "id": 4,
+      "transfer_type": "technical_cross",
+      "post_name": "安全测试工程师",
+      "core_skills_required": "测试基础 + 网络安全 + OWASP TOP10 + 渗透测试 + 漏洞挖掘 + 安全合规",
+      "transfer_path": "功能测试→学习安全基础→掌握渗透工具→漏洞挖掘实战→安全测试专家",
+      "advantages": "极度稀缺、薪资极高、政策合规刚需，职业极其稳定",
+      "demand": "中高"
+    },
+    {
+      "id": 5,
+      "transfer_type": "business_cross",
+      "post_name": "产品经理（测试转产品）",
+      "core_skills_required": "测试基础 + 需求分析 + 产品逻辑 + 原型设计 + 项目流程 + 用户体验",
+      "transfer_path": "测试→熟悉业务与需求→学习产品工具→参与需求评审→独立负责功能模块→产品经理",
+      "advantages": "懂逻辑懂缺陷，设计更严谨，沟通顺畅，转型成功率高",
+      "demand": "高"
+    },
+    {
+      "id": 6,
+      "transfer_type": "business_cross",
+      "post_name": "开发工程师（测试转开发）",
+      "core_skills_required": "测试基础 + 编程语言 + 后端/前端开发 + 数据库 + 项目架构",
+      "transfer_path": "测试→强化编码→学习业务开发→参与项目开发→独立负责模块→全栈开发",
+      "advantages": "懂测试更易写出高质量代码，薪资提升明显",
+      "demand": "中高"
+    },
+    {
+      "id": 7,
+      "transfer_type": "industry_cross",
+      "post_name": "车载测试工程师",
+      "core_skills_required": "测试基础 + 车载系统 + CANoe + 车机协议 + ISO26262 + 自动驾驶基础",
+      "transfer_path": "普通测试→学习车载知识→掌握车载测试工具→实车测试实战→车载测试专家",
+      "advantages": "行业风口、薪资极高、需求爆发式增长，技术壁垒高",
+      "demand": "极高"
+    },
+    {
+      "id": 8,
+      "transfer_type": "industry_cross",
+      "post_name": "AI测试工程师",
+      "core_skills_required": "测试基础 + 数据集测试 + 模型评估 + 对话效果评测 + 异常用例构造",
+      "transfer_path": "功能测试→学习AI基础→掌握评测方法→模型测试实战→AI测试专家",
+      "advantages": "新兴高薪赛道，需求暴涨，测试人员转型极有优势",
+      "demand": "极高"
+    }
+  ]
+}

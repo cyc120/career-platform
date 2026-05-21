@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     industry VARCHAR(255),
     city VARCHAR(100),
     salary_range VARCHAR(100),
+    company_scale VARCHAR(50),
     job_description TEXT,
     requirements TEXT,
     publish_date DATE,
@@ -142,12 +143,12 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
 INSERT OR IGNORE INTO users (username, email, password_hash) VALUES
 ('testuser', 'test@example.com', '$2b$12$LJ3m4ys3uz0Gv0gMOsYmNe8JI8k/.dRgRv0cOx5vGJy0fkKzJKHpy');
 
--- Seed data: sample jobs
-INSERT OR IGNORE INTO jobs (job_title, company, industry, city, salary_range, job_description, requirements, publish_date) VALUES
-('Python后端开发工程师', '字节跳动', '互联网/IT', '北京', '25k-50k', '负责后端服务的设计与开发，构建高可用、高并发的分布式系统。', '熟悉Python、Django/FastAPI、MySQL、Redis、分布式系统。3年以上后端开发经验。', DATE('now')),
-('前端开发工程师', '阿里巴巴', '互联网/IT', '杭州', '20k-45k', '负责Web前端开发，与设计师和后端紧密协作，实现优秀的用户体验。', '熟悉Vue.js/React、TypeScript、CSS3、前端工程化。', DATE('now')),
-('数据分析师', '腾讯', '互联网/IT', '深圳', '18k-35k', '负责数据收集、清洗、分析与可视化，为业务决策提供数据支持。', '熟悉Python/SQL、统计分析、机器学习基础、数据可视化工具。', DATE('now')),
-('产品经理', '美团', '互联网/IT', '上海', '22k-40k', '负责产品规划、需求分析与项目管理，推动产品从概念到上线。', '熟悉产品设计方法论、数据分析、项目管理、优秀的沟通能力。', DATE('now'));
+-- Seed data: sample jobs (use import_data.py for full 5000-job dataset)
+INSERT OR IGNORE INTO jobs (job_title, company, industry, city, salary_range, job_description, requirements, company_scale, publish_date) VALUES
+('Python后端开发工程师', '字节跳动', '互联网', '北京', '25k-50k', '负责后端服务的设计与开发，构建高可用、高并发的分布式系统。', '熟悉Python、Django/FastAPI、MySQL、Redis、分布式系统。3年以上后端开发经验。', '10000人以上', DATE('now')),
+('前端开发工程师', '阿里巴巴', '互联网', '杭州', '20k-45k', '负责Web前端开发，与设计师和后端紧密协作，实现优秀的用户体验。', '熟悉Vue.js/React、TypeScript、CSS3、前端工程化。', '10000人以上', DATE('now')),
+('数据分析师', '腾讯', '互联网', '深圳', '18k-35k', '负责数据收集、清洗、分析与可视化，为业务决策提供数据支持。', '熟悉Python/SQL、统计分析、机器学习基础、数据可视化工具。', '10000人以上', DATE('now')),
+('产品经理', '美团', '互联网', '上海', '22k-40k', '负责产品规划、需求分析与项目管理，推动产品从概念到上线。', '熟悉产品设计方法论、数据分析、项目管理、优秀的沟通能力。', '10000人以上', DATE('now'));
 
 -- Seed data: promotion paths
 INSERT OR IGNORE INTO promotion_transition (job_id, current_role, next_role, required_skills, years_exp, transition_type) VALUES

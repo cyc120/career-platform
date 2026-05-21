@@ -1,0 +1,168 @@
+{
+  "java_promotion_routes": [
+    {
+      "id": 1,
+      "route_type": "technical",
+      "level": 1,
+      "title": "初级Java工程师",
+      "experience_range": "0-2年",
+      "core_abilities": "Java基础、Spring Boot、数据库CRUD、简单接口开发、代码规范",
+      "key_responsibilities": "指导下完成模块开发、修复简单Bug、参与小型项目",
+      "salary_range_first_tier": "8k-15k/月"
+    },
+    {
+      "id": 2,
+      "route_type": "technical",
+      "level": 2,
+      "title": "中级Java工程师",
+      "experience_range": "2-5年",
+      "core_abilities": "并发编程、JVM基础、分布式基础（缓存/MQ）、微服务、性能调优",
+      "key_responsibilities": "独立负责复杂子系统、模块设计与重构、CodeReview",
+      "salary_range_first_tier": "15k-25k/月"
+    },
+    {
+      "id": 3,
+      "route_type": "technical",
+      "level": 3,
+      "title": "高级Java工程师/准架构师",
+      "experience_range": "5-8年",
+      "core_abilities": "微服务架构、DDD、分库分表、分布式事务、高可用设计",
+      "key_responsibilities": "主导系统设计、解决核心技术难题、制定技术规范",
+      "salary_range_first_tier": "25k-40k/月"
+    },
+    {
+      "id": 4,
+      "route_type": "technical",
+      "level": 4,
+      "title": "技术架构师/资深专家",
+      "experience_range": "8-12年+",
+      "core_abilities": "全局架构、技术选型、中间件研发、云原生、业务技术融合",
+      "key_responsibilities": "规划技术路线、把控项目架构、赋能团队、技术攻关",
+      "salary_range_first_tier": "40k-70k+/月"
+    },
+    {
+      "id": 5,
+      "route_type": "technical",
+      "level": 5,
+      "title": "首席架构师/技术Fellow",
+      "experience_range": "15年+",
+      "core_abilities": "行业技术洞察、前沿技术落地、核心技术壁垒构建",
+      "key_responsibilities": "决定公司技术战略、参与商业决策、构建技术壁垒",
+      "salary_range_first_tier": "70k+/月"
+    },
+    {
+      "id": 6,
+      "route_type": "management",
+      "level": 1,
+      "title": "技术组长/Team Leader",
+      "experience_range": "3-5年",
+      "core_abilities": "技术+基础管理、任务拆解、进度管控、人员协调",
+      "key_responsibilities": "管理3-5人小组、分配任务、把控开发进度",
+      "salary_range_first_tier": "18k-30k/月"
+    },
+    {
+      "id": 7,
+      "route_type": "management",
+      "level": 2,
+      "title": "技术经理/项目经理",
+      "experience_range": "5-8年",
+      "core_abilities": "项目管理、跨部门协作、需求分析、资源协调",
+      "key_responsibilities": "管理10-20人团队、负责业务线交付、流程优化",
+      "salary_range_first_tier": "30k-50k/月"
+    },
+    {
+      "id": 8,
+      "route_type": "management",
+      "level": 3,
+      "title": "技术总监/部门负责人",
+      "experience_range": "8-12年+",
+      "core_abilities": "战略落地、团队建设、成本质量管控、技术规划",
+      "key_responsibilities": "负责研发部门、制定规范、团队人才培养",
+      "salary_range_first_tier": "50k-80k+/月"
+    },
+    {
+      "id": 9,
+      "route_type": "management",
+      "level": 4,
+      "title": "CTO/技术VP",
+      "experience_range": "12年+",
+      "core_abilities": "商业视野、行业洞察、核心团队搭建、投融资对接",
+      "key_responsibilities": "公司技术战略、产品技术方向、核心团队管理",
+      "salary_range_first_tier": "80k+/月+股权"
+    }
+  ],
+  "java_transfer_routes": [
+    {
+      "id": 1,
+      "transfer_type": "technical_cross",
+      "post_name": "全栈工程师",
+      "core_skills_required": "Java后端+Vue/React+Node.js+DevOps",
+      "transfer_path": "Java后端→学习前端框架→掌握CI/CD→全流程开发",
+      "advantages": "薪资高20%、需求广、创业公司抢手",
+      "demand": "高"
+    },
+    {
+      "id": 2,
+      "transfer_type": "technical_cross",
+      "post_name": "大数据工程师",
+      "core_skills_required": "Java+Scala+Spark/Flink+数据仓库",
+      "transfer_path": "Java→学习Scala→大数据框架→实时计算",
+      "advantages": "Java生态契合、转型成本低",
+      "demand": "高"
+    },
+    {
+      "id": 3,
+      "transfer_type": "technical_cross",
+      "post_name": "测试开发工程师",
+      "core_skills_required": "Java+自动化测试框架+性能测试",
+      "transfer_path": "Java开发→JUnit/TestNG→接口自动化→性能测试",
+      "advantages": "压力小、稳定性高、懂开发的测试稀缺",
+      "demand": "中高"
+    },
+    {
+      "id": 4,
+      "transfer_type": "technical_cross",
+      "post_name": "DevOps/SRE",
+      "core_skills_required": "Java+K8s+Docker+Jenkins+监控系统",
+      "transfer_path": "Java微服务→容器化→CI/CD→运维开发",
+      "advantages": "云原生刚需、复合型人才稀缺",
+      "demand": "极高"
+    },
+    {
+      "id": 5,
+      "transfer_type": "business_cross",
+      "post_name": "技术产品经理",
+      "core_skills_required": "Java+需求分析+原型设计+业务理解",
+      "transfer_path": "Java开发→产品工具→业务分析→后台/ToB产品",
+      "advantages": "懂研发沟通高效、逻辑强、后台产品适配",
+      "demand": "中高"
+    },
+    {
+      "id": 6,
+      "transfer_type": "industry_cross",
+      "post_name": "金融Java专家",
+      "core_skills_required": "高可靠系统、支付清算、风控、分布式事务",
+      "transfer_path": "普通Java→金融业务→高并发交易→金融系统",
+      "advantages": "薪资高、行业壁垒强、稳定性高",
+      "demand": "中"
+    },
+    {
+      "id": 7,
+      "transfer_type": "industry_cross",
+      "post_name": "电商Java专家",
+      "core_skills_required": "订单库存、秒杀、高并发、分布式事务",
+      "transfer_path": "普通Java→电商业务→高并发优化→电商架构",
+      "advantages": "场景丰富、技术成长快、需求稳定",
+      "demand": "高"
+    },
+    {
+      "id": 8,
+      "transfer_type": "industry_cross",
+      "post_name": "云服务/SaaS专家",
+      "core_skills_required": "多租户、权限、分布式、低代码",
+      "transfer_path": "Java→云原生→SaaS架构→多租户设计",
+      "advantages": "技术前沿、发展空间大、薪资高",
+      "demand": "中高"
+    }
+  ]
+}

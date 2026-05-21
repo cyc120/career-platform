@@ -9,7 +9,7 @@ router = APIRouter()
 @router.get("")
 async def list_jobs(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, le=100),
+    page_size: int = Query(200, le=500),
     keyword: str = Query(""),
     industry: str = Query(""),
     city: str = Query(""),
@@ -23,6 +23,7 @@ async def list_jobs(
             "jobs": [
                 {"id": int(r.id), "job_title": r.job_title, "company": r.company,
                  "industry": r.industry, "city": r.city, "salary_range": r.salary_range,
+                 "company_scale": r.metadata.get("company_scale", "") if r.metadata else "",
                  "score": r.score}
                 for r in results
             ],
@@ -30,14 +31,14 @@ async def list_jobs(
         }
 
     offset = (page - 1) * page_size
-    query = "SELECT id, job_title, company, industry, city, salary_range, publish_date FROM jobs WHERE 1=1"
+    query = "SELECT id, job_title, company, industry, city, salary_range, company_scale, publish_date FROM jobs WHERE 1=1"
     params = {}
     if industry:
-        query += " AND industry = :ind"
-        params["ind"] = industry
+        query += " AND industry LIKE :ind"
+        params["ind"] = f"%{industry}%"
     if city:
-        query += " AND city = :ct"
-        params["ct"] = city
+        query += " AND city LIKE :ct"
+        params["ct"] = f"%{city}%"
     query += " ORDER BY publish_date DESC LIMIT :lim OFFSET :off"
     params["lim"] = page_size
     params["off"] = offset
@@ -56,6 +57,7 @@ async def search_jobs(q: str = Query(""), top_k: int = Query(10)):
         "jobs": [
             {"id": int(r.id), "job_title": r.job_title, "company": r.company,
              "industry": r.industry, "city": r.city, "salary_range": r.salary_range,
+             "company_scale": r.metadata.get("company_scale", "") if r.metadata else "",
              "score": r.score}
             for r in results
         ],
@@ -66,7 +68,7 @@ async def search_jobs(q: str = Query(""), top_k: int = Query(10)):
 async def hot_jobs(db=Depends(get_db)):
     """Top 10 most recent jobs."""
     result = await db.execute(
-        text("SELECT id, job_title, company, industry, city, salary_range FROM jobs ORDER BY publish_date DESC LIMIT 10")
+        text("SELECT id, job_title, company, industry, city, salary_range, company_scale FROM jobs ORDER BY publish_date DESC LIMIT 10")
     )
     return {"success": True, "jobs": [dict(r._mapping) for r in result.fetchall()]}
 

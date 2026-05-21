@@ -140,26 +140,28 @@ const selectedOptions = ref([])
 const selectedTags = ref([])
 const hoveredJob = ref(null)
 const allJobs = ref([])
+const currentPage = ref(1)
 
-const loadJobs = async () => {
+const loadJobs = async (reset = true) => {
   try {
     const params = {}
+    // Build API params: only industry and city go to backend
     selectedTags.value.forEach((tag) => {
-      params[tag.type] = tag.value
+      if (tag.type === 'industry' || tag.type === 'city') {
+        params[tag.type] = tag.value
+      }
     })
 
     let data
     if (searchQuery.value) {
-      // 有搜索关键词时使用 RAG 语义搜索
       const resp = await jobsApi.search(searchQuery.value, params)
       data = resp.data
     } else {
-      // 无关键词时使用 SQL 直接查询，确保有数据
-      const resp = await jobsApi.list(params)
+      const resp = await jobsApi.list({ ...params, page: currentPage.value, page_size: 200 })
       data = resp.data
     }
 
-    allJobs.value = (data.jobs || []).map((item, index) => ({
+    const mapped = (data.jobs || []).map((item, index) => ({
       ...item,
       id: item.id || index + 1,
       title: item.job_title || item.title,
@@ -167,11 +169,17 @@ const loadJobs = async () => {
       salary: item.salary_range || item.salary || '面议',
       scale: item.company_scale || '--',
       city: item.city || '--',
-      tags: item.industry ? item.industry.split(',').slice(0, 2) : [],
+      tags: item.industry ? item.industry.split(',') : [],
       description: item.job_description || item.description,
     }))
+
+    if (reset) {
+      allJobs.value = mapped
+    } else {
+      allJobs.value = [...allJobs.value, ...mapped]
+    }
   } catch {
-    allJobs.value = []
+    if (reset) allJobs.value = []
   }
 }
 
@@ -179,26 +187,31 @@ onMounted(() => {
   loadJobs()
 })
 
-// --- 🌟 无限滚动逻辑控制 ---
+// --- Infinite scroll ---
 const loading = ref(false)
-const count = ref(6) // 初始显示的条数
-const step = 4      // 每次滚动增加的条数
+const count = ref(20)
+const step = 20
 
-// 基础过滤后的全量列表
-const filteredJobs = computed(() => {
-  // 即使 allJobs 还没加载出来，也返回一个空数组，防止报错
-  if (!Array.isArray(allJobs.value)) return []
-  
-  if (!searchQuery.value) return allJobs.value
-  
-  return allJobs.value.filter(j => 
-    // 统一使用映射后的 title 和 company
-    (j.title && j.title.includes(searchQuery.value)) || 
-    (j.company && j.company.includes(searchQuery.value))
-  )
+const salaryFilteredJobs = computed(() => {
+  const salaryTags = selectedTags.value.filter(t => t.type === 'salary')
+  if (salaryTags.length === 0) return allJobs.value
+  return allJobs.value.filter(job => {
+    return salaryTags.some(tag => salaryInRange(job.salary, tag.value))
+  })
 })
 
-// 真正显示在页面上的部分数据
+const filteredJobs = computed(() => {
+  let result = salaryFilteredJobs.value
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(j =>
+      (j.title && j.title.toLowerCase().includes(q)) ||
+      (j.company && j.company.toLowerCase().includes(q))
+    )
+  }
+  return result
+})
+
 const displayedJobs = computed(() => {
   return filteredJobs.value.slice(0, count.value)
 })
@@ -209,20 +222,19 @@ const disabled = computed(() => loading.value || noMore.value)
 const loadMore = () => {
   if (disabled.value) return
   loading.value = true
-  
-  // 模拟网络请求延迟
   setTimeout(() => {
     count.value += step
     loading.value = false
-  }, 800)
+  }, 300)
 }
 
 const handleSearch = () => {
-  count.value = 6
+  count.value = 20
+  currentPage.value = 1
   loadJobs()
 }
 
-// --- 其他功能函数 ---
+// --- Filter functions ---
 const openFilterDialog = (type) => {
   activeFilterType.value = type
   selectedOptions.value = []
@@ -230,49 +242,117 @@ const openFilterDialog = (type) => {
 }
 
 const confirmSelection = () => {
+  if (selectedOptions.value.length === 0) {
+    dialogVisible.value = false
+    return
+  }
+  const options = filterOptions[activeFilterType.value]
   const newTags = selectedOptions.value.map(val => ({
     type: activeFilterType.value,
     value: val,
-    label: filterOptions[activeFilterType.value].find(o => o.value === val).label
+    label: options.find(o => o.value === val)?.label || val
   }))
+
+  // For industry/city: replace existing tags of same type (single select)
+  if (activeFilterType.value === 'industry' || activeFilterType.value === 'city') {
+    selectedTags.value = selectedTags.value.filter(t => t.type !== activeFilterType.value)
+  }
   selectedTags.value.push(...newTags)
-  count.value = 6 // 筛选时重置加载数量
+  count.value = 20
+  currentPage.value = 1
   dialogVisible.value = false
+  // Reload from backend when industry or city changes
+  if (activeFilterType.value === 'industry' || activeFilterType.value === 'city') {
+    loadJobs()
+  }
 }
 
 const removeTag = (tag) => {
   selectedTags.value = selectedTags.value.filter(t => t !== tag)
+  currentPage.value = 1
+  count.value = 20
+  if (tag.type === 'industry' || tag.type === 'city') {
+    loadJobs()
+  }
 }
 
 const goToJobDetail = (id) => {
   router.push({ name: 'JobDetail', params: { id } })
 }
 
+function parseSalaryRange(salaryStr) {
+  if (!salaryStr) return { min: 0, max: 0 }
+  const cleaned = salaryStr.replace(/,/g, '')
+  // Match patterns like "6k-8k", "10k-15k", "60k以上", "0k以下", "面议"
+  const rangeMatch = cleaned.match(/([\d.]+)k?\s*[-~至到]\s*([\d.]+)k?/)
+  if (rangeMatch) {
+    return { min: parseFloat(rangeMatch[1]), max: parseFloat(rangeMatch[2]) }
+  }
+  const aboveMatch = cleaned.match(/([\d.]+)k?\s*以上/)
+  if (aboveMatch) {
+    return { min: parseFloat(aboveMatch[1]), max: Infinity }
+  }
+  const belowMatch = cleaned.match(/([\d.]+)k?\s*以下/)
+  if (belowMatch) {
+    return { min: 0, max: parseFloat(belowMatch[1]) }
+  }
+  const singleMatch = cleaned.match(/([\d.]+)k?/)
+  if (singleMatch) {
+    const v = parseFloat(singleMatch[1])
+    return { min: v, max: v }
+  }
+  return { min: 0, max: 0 }
+}
+
+function salaryInRange(salaryStr, rangeValue) {
+  if (!salaryStr || rangeValue === '0') return true
+  const job = parseSalaryRange(salaryStr)
+  if (job.min === 0 && job.max === 0) return true
+
+  if (rangeValue.endsWith('+')) {
+    const filterMin = parseInt(rangeValue)
+    return job.max >= filterMin
+  }
+  const parts = rangeValue.split('-')
+  if (parts.length !== 2) return true
+  const filterMin = parseInt(parts[0].replace('k', ''))
+  const filterMax = parseInt(parts[1].replace('k', ''))
+  if (isNaN(filterMin) || isNaN(filterMax)) return true
+  // Range overlap: job's range intersects with filter range
+  return job.min <= filterMax && job.max >= filterMin
+}
+
 const filterCategories = [
   { type: 'industry', label: '行业' },
   { type: 'salary', label: '薪资' },
-  { type: 'experience', label: '经验' },
   { type: 'city', label: '城市' }
 ]
 
 const filterOptions = {
-  // 行业细分：涵盖主流技术与传统领域
   industry: [
-    { value: 'all', label: '全部行业' },
-    { value: 'it', label: '互联网/通信' },
-    { value: 'ai', label: '人工智能' },
-    { value: 'game', label: '游戏开发' },
-    { value: 'finance', label: '金融/银行' },
-    { value: 'edu', label: '教育培训' },
-    { value: 'medical', label: '医疗健康' },
-    { value: 'auto', label: '汽车交通' },
-    { value: 'e-commerce', label: '电子商务' }
+    { value: '计算机软件', label: '计算机软件' },
+    { value: 'IT服务', label: 'IT服务' },
+    { value: '互联网', label: '互联网' },
+    { value: '人工智能', label: '人工智能' },
+    { value: '电子/半导体/集成电路', label: '电子/半导体' },
+    { value: '通信/网络设备', label: '通信/网络' },
+    { value: '仪器仪表制造', label: '仪器仪表' },
+    { value: '计算机硬件', label: '计算机硬件' },
+    { value: '学术/科研', label: '学术/科研' },
+    { value: '电子设备制造', label: '电子设备制造' },
+    { value: '企业服务', label: '企业服务' },
+    { value: '工业自动化', label: '工业自动化' },
+    { value: '医药制造', label: '医药制造' },
+    { value: '物联网', label: '物联网' },
+    { value: '新媒体', label: '新媒体' },
+    { value: '咨询服务', label: '咨询服务' },
+    { value: '生物工程', label: '生物工程' },
+    { value: '专业技术服务', label: '专业技术服务' }
   ],
 
-  // 薪资范围：分层清晰，符合实际梯度
   salary: [
     { value: '0', label: '不限' },
-    { value: '3k-5k', label: '3k-5k' },
+    { value: '0-5k', label: '5k以下' },
     { value: '5k-10k', label: '5k-10k' },
     { value: '10k-15k', label: '10k-15k' },
     { value: '15k-25k', label: '15k-25k' },
@@ -281,29 +361,25 @@ const filterOptions = {
     { value: '60k+', label: '60k以上' }
   ],
 
-  // 工作经验：从校园到资深专家
-  experience: [
-    { value: 'all', label: '经验不限' },
-    { value: 'student', label: '在校/应届' },
-    { value: '1', label: '1年以内' },
-    { value: '1-3', label: '1-3年' },
-    { value: '3-5', label: '3-5年' },
-    { value: '5-10', label: '5-10年' },
-    { value: '10+', label: '10年以上' }
-  ],
-
-  // 热门城市：一线、新一线及远程
   city: [
-    { value: 'all', label: '全国' },
-    { value: 'beijing', label: '北京' },
-    { value: 'shanghai', label: '上海' },
-    { value: 'guangzhou', label: '广州' },
-    { value: 'shenzhen', label: '深圳' },
-    { value: 'hangzhou', label: '杭州' },
-    { value: 'chengdu', label: '成都' },
-    { value: 'wuhan', label: '武汉' },
-    { value: 'nanjing', label: '南京' },
-    { value: 'remote', label: '远程/居家' }
+    { value: '北京', label: '北京' },
+    { value: '深圳', label: '深圳' },
+    { value: '上海', label: '上海' },
+    { value: '广州', label: '广州' },
+    { value: '南京', label: '南京' },
+    { value: '成都', label: '成都' },
+    { value: '杭州', label: '杭州' },
+    { value: '武汉', label: '武汉' },
+    { value: '郑州', label: '郑州' },
+    { value: '苏州', label: '苏州' },
+    { value: '西安', label: '西安' },
+    { value: '重庆', label: '重庆' },
+    { value: '长沙', label: '长沙' },
+    { value: '济南', label: '济南' },
+    { value: '沈阳', label: '沈阳' },
+    { value: '合肥', label: '合肥' },
+    { value: '天津', label: '天津' },
+    { value: '青岛', label: '青岛' }
   ]
 }
 </script>

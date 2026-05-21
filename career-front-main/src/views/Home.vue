@@ -310,14 +310,14 @@
       <div class="scroll-track">
         <div class="scroll-group">
           <JobCard
-            v-for="job in hotJobs.slice(0, 3)"
+            v-for="job in hotJobs"
             :key="'r1-' + job.id"
             :job="formatJobData(job)"
           />
         </div>
         <div class="scroll-group" aria-hidden="true">
           <JobCard
-            v-for="job in hotJobs.slice(0, 3)"
+            v-for="job in hotJobs"
             :key="'r1-copy-' + job.id"
             :job="formatJobData(job)"
           />
@@ -329,14 +329,14 @@
       <div class="scroll-track">
         <div class="scroll-group">
           <JobCard
-            v-for="job in hotJobs.slice(3, 6)"
+            v-for="job in [...hotJobs].reverse()"
             :key="'r2-' + job.id"
             :job="formatJobData(job)"
           />
         </div>
         <div class="scroll-group" aria-hidden="true">
           <JobCard
-            v-for="job in hotJobs.slice(3, 6)"
+            v-for="job in [...hotJobs].reverse()"
             :key="'r2-copy-' + job.id"
             :job="formatJobData(job)"
           />
@@ -2163,12 +2163,12 @@ const handleResize = () => {
 
 /* 🌟 第一行动画：向左 */
 .row-left .scroll-track {
-  animation: scrollLeft 20s linear infinite;
+  animation: scrollLeft 12s linear infinite;
 }
 
 /* 🌟 第二行动画：反向（向右） */
 .row-right .scroll-track {
-  animation: scrollLeft 22s linear infinite reverse; /* 稍微改变时间可以产生错位感 */
+  animation: scrollLeft 14s linear infinite reverse;
 }
 
 .scroll-row {

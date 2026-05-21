@@ -17,7 +17,7 @@ async def ingest_all_jobs():
         result = await db.execute(
             text(
                 "SELECT id, job_title, company, industry, city, salary_range, "
-                "job_description, requirements FROM jobs"
+                "job_description, requirements, company_scale FROM jobs"
             )
         )
         rows = result.fetchall()
@@ -38,6 +38,7 @@ async def ingest_all_jobs():
             "industry": r[3] or "",
             "city": r[4] or "",
             "salary_range": r[5] or "",
+            "company_scale": r[8] or "",
         })
 
     # Compute embeddings and upsert

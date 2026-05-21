@@ -88,5 +88,16 @@ tmp/
 temp/
 *.tmp
 
+# Database files (SQLite)
+*.db
+*.db-shm
+*.db-wal
+
+# ChromaDB vector index
+chroma_data/
+
+# Temp analysis files
+filter_data.txt
+
 # Docker
 .dockerignore

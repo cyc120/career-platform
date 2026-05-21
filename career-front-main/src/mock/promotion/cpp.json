@@ -1,0 +1,168 @@
+{
+  "cpp_promotion_routes": [
+    {
+      "id": 1,
+      "route_type": "technical",
+      "level": 1,
+      "title": "初级C/C++工程师",
+      "experience_range": "0-2年",
+      "core_abilities": "C/C++基础语法、指针与内存、STL、基础IO、简单多线程、基础调试",
+      "key_responsibilities": "模块编码、简单Bug修复、接口实现、文档编写、单元测试",
+      "salary_range_first_tier": "9k-18k/月"
+    },
+    {
+      "id": 2,
+      "route_type": "technical",
+      "level": 2,
+      "title": "中级C/C++工程师",
+      "experience_range": "2-5年",
+      "core_abilities": "内存管理、多线程同步、网络编程、数据结构与算法、Linux开发、GDB调试",
+      "key_responsibilities": "独立模块设计、性能优化、第三方库集成、服务端/客户端开发",
+      "salary_range_first_tier": "18k-30k/月"
+    },
+    {
+      "id": 3,
+      "route_type": "technical",
+      "level": 3,
+      "title": "高级C/C++工程师/准架构师",
+      "experience_range": "5-8年",
+      "core_abilities": "高性能架构、底层开发、汇编基础、内存泄漏排查、高并发、跨平台、中间件开发",
+      "key_responsibilities": "核心模块设计、性能瓶颈优化、架构方案制定、技术难点攻坚",
+      "salary_range_first_tier": "30k-50k/月"
+    },
+    {
+      "id": 4,
+      "route_type": "technical",
+      "level": 4,
+      "title": "技术架构师/资深专家",
+      "experience_range": "8-12年+",
+      "core_abilities": "系统级架构、操作系统原理、编译器/虚拟机、驱动/内核、分布式底层、云原生底层",
+      "key_responsibilities": "整体架构设计、技术选型、底层组件研发、团队技术赋能、重大问题定位",
+      "salary_range_first_tier": "50k-80k+/月"
+    },
+    {
+      "id": 5,
+      "route_type": "technical",
+      "level": 5,
+      "title": "首席架构师/技术专家",
+      "experience_range": "12年+",
+      "core_abilities": "行业底层技术壁垒构建、前沿技术研究、编译器/操作系统级优化",
+      "key_responsibilities": "公司技术战略、核心技术路线规划、顶级技术攻关、产学研合作",
+      "salary_range_first_tier": "80k+/月"
+    },
+    {
+      "id": 6,
+      "route_type": "management",
+      "level": 1,
+      "title": "技术组长/Team Leader",
+      "experience_range": "3-5年",
+      "core_abilities": "C/C++技术+任务拆解、进度管理、CodeReview、基础团队协调",
+      "key_responsibilities": "小组开发管理、需求拆解、代码质量把控、日常进度推进",
+      "salary_range_first_tier": "22k-35k/月"
+    },
+    {
+      "id": 7,
+      "route_type": "management",
+      "level": 2,
+      "title": "技术经理/研发经理",
+      "experience_range": "5-8年",
+      "core_abilities": "项目管理、跨部门协作、资源协调、研发流程建设、质量管控",
+      "key_responsibilities": "团队交付管理、项目规划、风险控制、人员培养",
+      "salary_range_first_tier": "35k-60k/月"
+    },
+    {
+      "id": 8,
+      "route_type": "management",
+      "level": 3,
+      "title": "技术总监/部门负责人",
+      "experience_range": "8-12年+",
+      "core_abilities": "技术战略落地、团队体系搭建、成本与效率管理、平台化建设",
+      "key_responsibilities": "部门整体规划、技术体系建设、重大项目统筹、人才梯队",
+      "salary_range_first_tier": "60k-90k+/月"
+    },
+    {
+      "id": 9,
+      "route_type": "management",
+      "level": 4,
+      "title": "CTO/技术VP",
+      "experience_range": "12年+",
+      "core_abilities": "商业视野、行业技术趋势、核心团队搭建、投融资对接",
+      "key_responsibilities": "公司整体技术战略、产品技术方向、核心团队管理",
+      "salary_range_first_tier": "90k+/月+股权"
+    }
+  ],
+  "cpp_transfer_routes": [
+    {
+      "id": 1,
+      "transfer_type": "technical_cross",
+      "post_name": "游戏引擎/游戏开发工程师",
+      "core_skills_required": "C/C++、图形API、Unity/Unreal、3D数学、渲染管线",
+      "transfer_path": "C/C++→图形学→游戏引擎→渲染/物理/逻辑开发",
+      "advantages": "薪资高、技术深度强、行业需求稳定",
+      "demand": "高"
+    },
+    {
+      "id": 2,
+      "transfer_type": "technical_cross",
+      "post_name": "嵌入式/驱动开发工程师",
+      "core_skills_required": "C/C++、ARM、RTOS、Linux内核、硬件接口、驱动开发",
+      "transfer_path": "C/C++→单片机→嵌入式Linux→驱动/底层系统开发",
+      "advantages": "技术壁垒高、越老越吃香、35岁风险低",
+      "demand": "极高"
+    },
+    {
+      "id": 3,
+      "transfer_type": "technical_cross",
+      "post_name": "高性能后端/基础架构工程师",
+      "core_skills_required": "C/C++、网络编程、高并发、协程、存储引擎、中间件",
+      "transfer_path": "C/C++服务端→高性能框架→分布式存储/网关/消息队列",
+      "advantages": "大厂核心岗、技术天花板高、薪资溢价明显",
+      "demand": "高"
+    },
+    {
+      "id": 4,
+      "transfer_type": "technical_cross",
+      "post_name": "编译器/虚拟机开发工程师",
+      "core_skills_required": "C/C++、编译原理、汇编、LLVM/GCC、JVM/解释器",
+      "transfer_path": "C/C++→编译原理→LLVM开发→语言/运行时研发",
+      "advantages": "顶级技术岗、稀缺度极高、薪资顶尖",
+      "demand": "中高"
+    },
+    {
+      "id": 5,
+      "transfer_type": "technical_cross",
+      "post_name": "音视频/流媒体开发工程师",
+      "core_skills_required": "C/C++、FFmpeg、WebRTC、编解码、RTMP/RTSP",
+      "transfer_path": "C/C++→音视频基础→流媒体服务器/播放器开发",
+      "advantages": "直播/短视频刚需、技术深度高、薪资高",
+      "demand": "高"
+    },
+    {
+      "id": 6,
+      "transfer_type": "business_cross",
+      "post_name": "技术产品经理（底层/硬件方向）",
+      "core_skills_required": "C/C+++系统理解+需求分析+硬件/嵌入式知识",
+      "transfer_path": "C/C++开发→产品工具→底层/硬件类产品设计",
+      "advantages": "懂底层技术沟通极顺畅、竞争压力小",
+      "demand": "中高"
+    },
+    {
+      "id": 7,
+      "transfer_type": "industry_cross",
+      "post_name": "自动驾驶/车载系统工程师",
+      "core_skills_required": "C/C++、ROS、QNX、AutoSar、实时系统",
+      "transfer_path": "C/C++→嵌入式/系统→车载平台→自动驾驶中间件",
+      "advantages": "行业风口、薪资极高、长期需求大",
+      "demand": "极高"
+    },
+    {
+      "id": 8,
+      "transfer_type": "industry_cross",
+      "post_name": "AI框架/推理引擎开发工程师",
+      "core_skills_required": "C/C++、CUDA、张量计算、模型推理优化",
+      "transfer_path": "C/C++→高性能计算→AI算子/推理引擎开发",
+      "advantages": "AI核心底层岗、技术稀缺、大厂争抢",
+      "demand": "极高"
+    }
+  ]
+}

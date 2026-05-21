@@ -1,0 +1,168 @@
+{
+  "frontend_promotion_routes": [
+    {
+      "id": 1,
+      "route_type": "technical",
+      "level": 1,
+      "title": "初级前端开发工程师",
+      "experience_range": "0-2年",
+      "core_abilities": "HTML5、CSS3、JavaScript基础、DOM操作、简单Vue/React框架使用、响应式布局、基础调试",
+      "key_responsibilities": "页面还原、简单交互实现、配合后端对接接口、修复简单页面Bug、参与小型项目前端开发",
+      "salary_range_first_tier": "8k-16k/月"
+    },
+    {
+      "id": 2,
+      "route_type": "technical",
+      "level": 2,
+      "title": "中级前端开发工程师",
+      "experience_range": "2-5年",
+      "core_abilities": "JavaScript进阶（闭包、原型、异步）、Vue/React框架精通、组件封装、工程化（Webpack）、接口联调、跨浏览器兼容、基础性能优化",
+      "key_responsibilities": "独立负责页面模块开发、组件设计与封装、前端工程化配置、配合产品需求落地、代码Review",
+      "salary_range_first_tier": "16k-28k/月"
+    },
+    {
+      "id": 3,
+      "route_type": "technical",
+      "level": 3,
+      "title": "高级前端开发工程师/准架构师",
+      "experience_range": "5-8年",
+      "core_abilities": "前端架构设计、性能优化（首屏、加载、渲染）、跨端开发（小程序/uni-app）、TypeScript精通、微前端、前端监控、框架源码理解",
+      "key_responsibilities": "主导前端架构设计、核心模块开发、性能瓶颈攻坚、制定前端技术规范、赋能团队技术成长",
+      "salary_range_first_tier": "28k-45k/月"
+    },
+    {
+      "id": 4,
+      "route_type": "technical",
+      "level": 4,
+      "title": "前端架构师/资深专家",
+      "experience_range": "8-12年+",
+      "core_abilities": "前端生态搭建、跨端架构设计、工程化体系完善、前端安全、大前端技术选型、前沿技术落地（如AI+前端）、跨团队技术协同",
+      "key_responsibilities": "规划前端技术路线、搭建前端基础设施、把控重大项目前端架构、解决顶级技术难题、推动前端技术创新",
+      "salary_range_first_tier": "45k-75k+/月"
+    },
+    {
+      "id": 5,
+      "route_type": "technical",
+      "level": 5,
+      "title": "首席前端架构师/技术Fellow",
+      "experience_range": "12年+",
+      "core_abilities": "行业前端技术趋势洞察、核心技术壁垒构建、前端技术战略制定、跨领域技术融合、前端团队体系搭建",
+      "key_responsibilities": "制定公司前端整体技术战略、主导核心技术研发、参与商业决策、推动前端技术产业化、培养顶尖前端人才",
+      "salary_range_first_tier": "75k+/月"
+    },
+    {
+      "id": 6,
+      "route_type": "management",
+      "level": 1,
+      "title": "前端组长/Team Leader",
+      "experience_range": "3-5年",
+      "core_abilities": "前端技术+任务拆解、进度管控、CodeReview、团队协调、需求对接",
+      "key_responsibilities": "管理3-5人前端小组、分配开发任务、把控代码质量、推进项目进度、协调前后端协作",
+      "salary_range_first_tier": "20k-32k/月"
+    },
+    {
+      "id": 7,
+      "route_type": "management",
+      "level": 2,
+      "title": "前端经理/研发经理",
+      "experience_range": "5-8年",
+      "core_abilities": "项目管理、跨部门协作、资源协调、前端团队建设、研发流程优化、需求分析",
+      "key_responsibilities": "管理10-20人前端团队、负责前端业务线交付、制定研发规范、培养前端人才、把控项目风险",
+      "salary_range_first_tier": "32k-55k/月"
+    },
+    {
+      "id": 8,
+      "route_type": "management",
+      "level": 3,
+      "title": "前端总监/部门负责人",
+      "experience_range": "8-12年+",
+      "core_abilities": "前端技术战略落地、团队体系搭建、成本与效率管控、平台化建设、跨领域协同",
+      "key_responsibilities": "负责前端部门整体规划、搭建前端技术体系、统筹重大项目前端交付、打造人才梯队",
+      "salary_range_first_tier": "55k-85k+/月"
+    },
+    {
+      "id": 9,
+      "route_type": "management",
+      "level": 4,
+      "title": "CTO/技术VP",
+      "experience_range": "12年+",
+      "core_abilities": "商业视野、行业技术趋势、全栈技术认知、核心团队搭建、投融资对接",
+      "key_responsibilities": "公司整体技术战略、产品技术方向、核心团队管理、推动技术与业务深度融合",
+      "salary_range_first_tier": "85k+/月+股权"
+    }
+  ],
+  "frontend_transfer_routes": [
+    {
+      "id": 1,
+      "transfer_type": "technical_cross",
+      "post_name": "全栈开发工程师",
+      "core_skills_required": "前端（Vue/React/TS）+ Node.js + 数据库（MySQL/MongoDB）+ 接口开发",
+      "transfer_path": "前端开发→学习Node.js→掌握后端基础→接口开发→全流程开发",
+      "advantages": "薪资高15%-25%、需求广泛、创业公司/中小团队抢手、职业选择灵活",
+      "demand": "高"
+    },
+    {
+      "id": 2,
+      "transfer_type": "technical_cross",
+      "post_name": "跨端开发工程师（小程序/APP）",
+      "core_skills_required": "前端基础 + uni-app/Taro/Flutter + 原生适配 + 跨端性能优化",
+      "transfer_path": "前端开发→学习跨端框架→原生适配调试→跨端项目实战",
+      "advantages": "跨端需求旺盛、技术复用性强、薪资溢价明显、适配多场景开发",
+      "demand": "极高"
+    },
+    {
+      "id": 3,
+      "transfer_type": "technical_cross",
+      "post_name": "前端可视化工程师",
+      "core_skills_required": "前端基础 + ECharts/Three.js + 数据可视化 + 3D渲染 + 性能优化",
+      "transfer_path": "前端开发→掌握可视化库→3D基础学习→可视化项目实战→大数据可视化",
+      "advantages": "技术壁垒高、稀缺性强、大厂核心岗、薪资顶尖",
+      "demand": "中高"
+    },
+    {
+      "id": 4,
+      "transfer_type": "technical_cross",
+      "post_name": "前端工程化/基建工程师",
+      "core_skills_required": "前端基础 + Webpack/Vite + 构建工具开发 + 前端监控 + CI/CD",
+      "transfer_path": "前端开发→深入工程化配置→基建工具开发→前端监控体系搭建",
+      "advantages": "后端化前端岗、稳定性高、技术深度强、不可替代性强",
+      "demand": "高"
+    },
+    {
+      "id": 5,
+      "transfer_type": "technical_cross",
+      "post_name": "AI前端工程师",
+      "core_skills_required": "前端基础 + TS + 大模型API对接 + AI交互设计 + 可视化展示",
+      "transfer_path": "前端开发→学习大模型基础→API对接实战→AI交互开发→智能应用落地",
+      "advantages": "AI风口赛道、需求激增、薪资高、技术前景广阔",
+      "demand": "极高"
+    },
+    {
+      "id": 6,
+      "transfer_type": "business_cross",
+      "post_name": "技术产品经理（前端方向）",
+      "core_skills_required": "前端技术 + 需求分析 + 原型设计 + 产品思维 + 用户体验",
+      "transfer_path": "前端开发→学习产品工具（Axure）→业务分析→前端相关产品设计",
+      "advantages": "懂前端技术、与研发沟通高效、逻辑清晰、适配后台/ToB/前端工具类产品",
+      "demand": "中高"
+    },
+    {
+      "id": 7,
+      "transfer_type": "industry_cross",
+      "post_name": "车载前端工程师",
+      "core_skills_required": "前端基础 + 车载系统（Android Automotive OS）+ 车载UI开发 + 实时交互",
+      "transfer_path": "前端开发→车载系统学习→车载UI适配→车载交互开发",
+      "advantages": "自动驾驶风口、薪资极高、行业需求稳定、技术壁垒高",
+      "demand": "极高"
+    },
+    {
+      "id": 8,
+      "transfer_type": "industry_cross",
+      "post_name": "小程序/小游戏开发工程师",
+      "core_skills_required": "前端基础 + 微信/支付宝小程序 + 小游戏开发 + 性能优化",
+      "transfer_path": "前端开发→小程序框架学习→小程序项目实战→小游戏开发",
+      "advantages": "场景广泛、需求旺盛、入门门槛适中、兼职/全职均可",
+      "demand": "高"
+    }
+  ]
+}

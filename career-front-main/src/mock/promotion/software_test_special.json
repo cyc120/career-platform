@@ -1,0 +1,168 @@
+{
+  "software_test_special_promotion_routes": [
+    {
+      "id": 1,
+      "route_type": "technical",
+      "level": 1,
+      "title": "初级软件测试工程师（专项入门）",
+      "experience_range": "0-2年",
+      "core_abilities": "软件测试基础、测试用例编写、缺陷管理（JIRA）、功能测试执行、基础自动化工具使用（Selenium入门）、测试报告撰写、熟悉至少1种专项测试基础（自动化/性能/安全）",
+      "key_responsibilities": "协助完成专项测试任务、执行功能及基础专项测试用例、记录测试缺陷、整理测试数据、配合研发修复问题、编写基础专项测试报告、学习专项测试工具与方法",
+      "salary_range_first_tier": "8k-16k/月"
+    },
+    {
+      "id": 2,
+      "route_type": "technical",
+      "level": 2,
+      "title": "中级软件测试工程师（专项进阶）",
+      "experience_range": "2-5年",
+      "core_abilities": "精通1-2个专项测试方向（自动化/性能/安全/兼容性）、专项测试方案设计、自动化脚本编写（Python+Selenium/Appium）、性能测试工具（JMeter/LoadRunner）使用、安全测试基础（OWASP Top 10）、缺陷根源分析",
+      "key_responsibilities": "独立负责专项测试方案设计与执行、编写专项自动化脚本、开展性能/安全/兼容性测试、分析测试缺陷根源、优化专项测试流程、输出完整专项测试报告、指导初级测试工程师",
+      "salary_range_first_tier": "16k-28k/月"
+    },
+    {
+      "id": 3,
+      "route_type": "technical",
+      "level": 3,
+      "title": "高级软件测试工程师（专项专家）",
+      "experience_range": "5-8年",
+      "core_abilities": "深耕1个核心专项（自动化/性能/安全）、专项测试体系搭建、测试自动化框架设计、性能瓶颈排查与调优、安全渗透测试、专项测试策略制定、跨部门技术协同",
+      "key_responsibilities": "主导专项测试体系搭建、制定专项测试战略与规范、负责核心产品专项测试统筹、排查复杂专项测试缺陷、设计专项测试框架、推动专项测试技术落地、赋能团队专项能力成长",
+      "salary_range_first_tier": "28k-45k/月"
+    },
+    {
+      "id": 4,
+      "route_type": "technical",
+      "level": 4,
+      "title": "软件测试专项架构师/资深专家",
+      "experience_range": "8-12年+",
+      "core_abilities": "专项测试架构设计、自动化测试平台搭建、前沿专项测试技术研究（AI辅助测试、混沌工程）、跨领域专项测试方案、专项测试技术创新、行业技术洞察、专项测试标准制定",
+      "key_responsibilities": "规划专项测试技术路线、搭建专项测试基础设施、制定企业级专项测试标准、解决顶级专项测试难题、推动专项测试技术迭代、引领行业专项测试技术发展",
+      "salary_range_first_tier": "45k-75k+/月"
+    },
+    {
+      "id": 5,
+      "route_type": "technical",
+      "level": 5,
+      "title": "首席软件测试专项专家/技术Fellow",
+      "experience_range": "12年+",
+      "core_abilities": "行业专项测试技术趋势洞察、核心专项技术壁垒构建、专项测试战略制定、跨领域技术融合、专项测试团队体系搭建、产学研合作、专项测试技术产业化",
+      "key_responsibilities": "制定公司专项测试整体技术战略、主导核心专项测试技术研发、参与商业决策、推动专项测试技术产业化、培养顶尖专项测试人才、引领行业专项测试技术创新",
+      "salary_range_first_tier": "75k+/月"
+    },
+    {
+      "id": 6,
+      "route_type": "management",
+      "level": 1,
+      "title": "软件测试专项组长/Team Leader",
+      "experience_range": "3-5年",
+      "core_abilities": "专项测试技术+任务拆解、进度管控、专项测试团队协调、需求对接、测试质量把控、专项测试流程优化",
+      "key_responsibilities": "管理3-5人专项测试小组、分配专项测试任务、把控测试进度与质量、协调研发/产品对接、组织专项测试用例评审、推动专项测试效率提升",
+      "salary_range_first_tier": "20k-32k/月"
+    },
+    {
+      "id": 7,
+      "route_type": "management",
+      "level": 2,
+      "title": "软件测试专项经理/研发测试经理",
+      "experience_range": "5-8年",
+      "core_abilities": "项目管理、跨部门协作、资源协调、专项测试团队建设、研发流程优化、测试成本管控、专项测试体系搭建",
+      "key_responsibilities": "管理10-20人专项测试团队、负责专项测试业务线交付、制定专项测试研发规范、培养专项测试人才、把控项目专项测试风险、优化专项测试资源配置",
+      "salary_range_first_tier": "32k-55k/月"
+    },
+    {
+      "id": 8,
+      "route_type": "management",
+      "level": 3,
+      "title": "软件测试专项总监/部门负责人",
+      "experience_range": "8-12年+",
+      "core_abilities": "专项测试技术战略落地、团队体系搭建、成本与效率管控、专项测试平台化建设、跨领域协同、质量体系构建",
+      "key_responsibilities": "负责专项测试部门整体规划、搭建专项测试技术体系、统筹重大项目专项测试交付、打造专项测试人才梯队、推动专项测试与业务深度融合",
+      "salary_range_first_tier": "55k-85k+/月"
+    },
+    {
+      "id": 9,
+      "route_type": "management",
+      "level": 4,
+      "title": "CTO/技术VP",
+      "experience_range": "12年+",
+      "core_abilities": "商业视野、行业技术趋势、软件全流程认知、核心团队搭建、投融资对接、质量战略制定",
+      "key_responsibilities": "公司整体技术战略、软件产品技术方向、核心团队管理、推动软件测试与业务深度融合、把控产品质量与研发效率、制定质量战略",
+      "salary_range_first_tier": "85k+/月+股权"
+    }
+  ],
+  "software_test_special_transfer_routes": [
+    {
+      "id": 1,
+      "transfer_type": "technical_cross",
+      "post_name": "自动化测试工程师（专项深化）",
+      "core_skills_required": "软件测试基础 + Python/Java + 自动化框架（Selenium/Appium/Cypress）+ CI/CD集成 + 自动化测试平台开发",
+      "transfer_path": "软件测试入门→学习编程语言→掌握自动化工具→搭建自动化框架→自动化平台开发→专项深化",
+      "advantages": "技术壁垒高、薪资溢价明显、需求旺盛、35岁风险低，契合当前测试自动化趋势",
+      "demand": "极高"
+    },
+    {
+      "id": 2,
+      "transfer_type": "technical_cross",
+      "post_name": "性能测试工程师（专项深化）",
+      "core_skills_required": "软件测试基础 + 性能测试工具（JMeter/LoadRunner）+ 监控分析工具 + 全链路压测 + 性能调优",
+      "transfer_path": "软件测试入门→学习性能测试工具→掌握性能分析方法→全链路压测实战→性能调优→专项深化",
+      "advantages": "稀缺性强、大厂核心岗、薪资顶尖、技术深度高，解决产品核心性能痛点",
+      "demand": "高"
+    },
+    {
+      "id": 3,
+      "transfer_type": "technical_cross",
+      "post_name": "安全测试工程师（专项深化）",
+      "core_skills_required": "软件测试基础 + OWASP Top 10 + 渗透测试工具 + 安全漏洞挖掘 + SDL安全测试流程",
+      "transfer_path": "软件测试入门→学习安全测试基础→掌握渗透测试工具→漏洞挖掘实战→SDL流程落地→专项深化",
+      "advantages": "行业缺口大、薪资极高、不可替代性强，契合网络安全行业趋势",
+      "demand": "中高"
+    },
+    {
+      "id": 4,
+      "transfer_type": "technical_cross",
+      "post_name": "测试开发工程师（专项延伸）",
+      "core_skills_required": "软件测试基础 + 编程语言（Python/Java/Go）+ 测试框架开发 + DevOps工具链 + 测试平台搭建",
+      "transfer_path": "软件测试→学习编程进阶→开发测试工具→搭建测试平台→DevOps集成→专项延伸",
+      "advantages": "薪资顶尖、大厂刚需、技术竞争力强，实现从“测试”到“开发+测试”的转型",
+      "demand": "极高"
+    },
+    {
+      "id": 5,
+      "transfer_type": "technical_cross",
+      "post_name": "AI/大数据测试工程师（专项新兴）",
+      "core_skills_required": "软件测试基础 + 数据质量验证 + 模型评估 + Pipeline测试 + 大数据工具（Hadoop）",
+      "transfer_path": "软件测试→学习大数据基础→掌握AI测试方法→数据质量测试→模型验证→专项深耕",
+      "advantages": "新兴高薪赛道、需求激增、技术前景广阔，契合AI与大数据行业发展",
+      "demand": "高"
+    },
+    {
+      "id": 6,
+      "transfer_type": "business_cross",
+      "post_name": "技术产品经理（测试方向）",
+      "core_skills_required": "软件测试技术 + 需求分析 + 产品思维 + 原型设计（Axure）+ 质量体系认知",
+      "transfer_path": "软件测试→学习产品工具→业务分析→测试相关产品设计→需求落地→产品统筹",
+      "advantages": "懂测试技术、与研发/测试沟通高效、逻辑清晰，适配测试工具类/质量类产品",
+      "demand": "中高"
+    },
+    {
+      "id": 7,
+      "transfer_type": "industry_cross",
+      "post_name": "车载软件测试工程师（专项跨界）",
+      "core_skills_required": "软件测试基础 + 车载软件知识（MCU/车载系统）+ 车载测试标准（ISO26262）+ 车载专项测试",
+      "transfer_path": "软件测试→学习车载软件知识→掌握车载测试标准→车载专项测试实战→测试优化",
+      "advantages": "自动驾驶风口、薪资极高、行业需求稳定、技术壁垒高，专项适配性强",
+      "demand": "极高"
+    },
+    {
+      "id": 8,
+      "transfer_type": "industry_cross",
+      "post_name": "元宇宙/XR软件测试工程师（专项新兴）",
+      "core_skills_required": "软件测试基础 + XR设备知识 + 沉浸式体验测试 + 数字孪生验证 + 虚拟场景测试",
+      "transfer_path": "软件测试→学习XR设备基础→掌握沉浸式测试方法→虚拟场景测试→专项深耕",
+      "advantages": "新兴赛道、稀缺性强、薪资高、发展空间广，契合元宇宙行业趋势",
+      "demand": "中高"
+    }
+  ]
+}
