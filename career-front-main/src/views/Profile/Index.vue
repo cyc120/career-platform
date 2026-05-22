@@ -789,6 +789,7 @@ const completionLabel = computed(() => {
 /* 4. 右侧看板：这是你之前失败的关键点 */
 .dashboard-preview-section {
   flex: 0.8;
+  min-width: 0;
   display: flex;       /* 新增：开启 flex 模式 */
   flex-direction: column; /* 新增 */
   border-radius: 20px;
@@ -1159,9 +1160,10 @@ const completionLabel = computed(() => {
 
 /* 保持雷达图有固定高度，不会因为滚动而坍塌 */
 .preview-radar-placeholder {
-  height: 300px; 
+  height: 300px;
   min-height: 300px;
   width: 100%;
+  min-width: 0;
 }
 
 /* 核心亮点标签 */

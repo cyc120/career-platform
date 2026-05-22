@@ -1,26 +1,30 @@
 <template>
-  <div ref="chartRef" style="width: 100%; height: 100%;"></div>
+  <div ref="chartRef" class="radar-chart-root"></div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted } from 'vue';
-import * as echarts from 'echarts';
+import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import * as echarts from 'echarts'
 
 const props = defineProps({
-  data: { type: Array, default: () => [0,0,0,0,0,0,0,0,0] }
-});
+  data: { type: Array, default: () => [0, 0, 0, 0, 0, 0, 0] }
+})
 
-const chartRef = ref(null);
-let myChart = null;
+const chartRef = ref(null)
+let myChart = null
+let observer = null
 
-const initChart = () => {
-  if (!chartRef.value) return;
-  myChart = echarts.init(chartRef.value);
-  const option = {
+const handleResize = () => myChart?.resize()
+
+function doInit() {
+  if (myChart || !chartRef.value) return true
+  const el = chartRef.value
+  if (el.offsetWidth === 0 || el.offsetHeight === 0) return false
+
+  myChart = echarts.init(el)
+  myChart.setOption({
     radar: {
-      // 🌟 核心修改 1：降低半径占比（从默认约 75% 降至 60%），为外圈文字留出空间
       radius: '55%',
-      // 🌟 核心修改 2：中心点稍微下移，给顶部文字更多空间
       center: ['50%', '55%'],
       indicator: [
         { name: '专业技能', max: 100 },
@@ -33,12 +37,7 @@ const initChart = () => {
       ],
       shape: 'circle',
       splitNumber: 4,
-      // 🌟 核心修改 3：通过 padding 确保文字不会紧贴绘图区边缘
-      axisName: { 
-        color: '#64748b', 
-        fontSize: 11,
-        padding: [2, 10] 
-      },
+      axisName: { color: '#64748b', fontSize: 11, padding: [2, 10] },
       splitLine: { lineStyle: { color: 'rgba(0,0,0,0.05)' } },
       splitArea: { show: false }
     },
@@ -59,23 +58,45 @@ const initChart = () => {
       }],
       animationDuration: 1200
     }]
-  };
-  myChart.setOption(option);
-};
+  })
+  return true
+}
 
 watch(() => props.data, (newData) => {
   if (myChart) {
-    myChart.setOption({ series: [{ data: [{ value: newData }] }] });
+    myChart.setOption({ series: [{ data: [{ value: newData }] }] })
   }
-}, { deep: true });
+}, { deep: true })
 
-onMounted(() => {
-  initChart();
-  window.addEventListener('resize', () => myChart?.resize());
-});
+onMounted(async () => {
+  await nextTick()
+  requestAnimationFrame(() => {
+    if (doInit()) return
+
+    observer = new ResizeObserver(() => {
+      if (doInit()) {
+        observer?.disconnect()
+        observer = null
+      }
+    })
+    observer.observe(chartRef.value)
+  })
+
+  window.addEventListener('resize', handleResize)
+})
 
 onUnmounted(() => {
-  window.removeEventListener('resize', () => myChart?.resize());
-  myChart?.dispose();
-});
+  window.removeEventListener('resize', handleResize)
+  observer?.disconnect()
+  observer = null
+  myChart?.dispose()
+  myChart = null
+})
 </script>
+
+<style scoped>
+.radar-chart-root {
+  width: 100%;
+  height: 100%;
+}
+</style>

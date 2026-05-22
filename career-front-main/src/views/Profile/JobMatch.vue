@@ -213,6 +213,28 @@ import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
 
 const router = useRouter()
 
+// ==================== 缓存 ====================
+const CACHE_KEY = 'job_match_cache'
+
+const saveToCache = (results, index, profileHash) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ results, index, profileHash }))
+  } catch { /* quota exceeded, ignore */ }
+}
+
+const loadFromCache = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+const clearCache = () => sessionStorage.removeItem(CACHE_KEY)
+
+const hashProfile = (radar) => JSON.stringify(radar || [])
+
 // ==================== 状态 ====================
 const loading = ref(false)
 const rankedResults = ref([])
@@ -241,6 +263,7 @@ const startMatch = async () => {
   loading.value = true
   rankedResults.value = []
   selectedIndex.value = 0
+  clearCache()
   currentStep.value = 0
 
   // 模拟步骤进度
@@ -280,11 +303,13 @@ const startMatch = async () => {
     }
 
     rankedResults.value = results
+    selectedIndex.value = 0
     currentStep.value = loadingSteps.length - 1
+    saveToCache(results, 0, hashProfile(currentRadarData.value))
     ElMessage.success(`匹配完成，共找到 ${results.length} 个岗位`)
 
     await nextTick()
-    initRadarChart()
+    requestAnimationFrame(() => initRadarChart())
   } catch (err) {
     console.error('[JobMatch] match failed:', err)
     ElMessage.error('匹配请求失败，请稍后重试')
@@ -297,6 +322,9 @@ const startMatch = async () => {
 // ==================== 选中切换 ====================
 const selectJob = (idx) => {
   selectedIndex.value = idx
+  // persist selection to cache
+  const cached = loadFromCache()
+  if (cached) saveToCache(cached.results, idx, cached.profileHash)
   nextTick(() => updateRadarChart())
 }
 
@@ -311,9 +339,25 @@ const DIM_NAMES = ['专业技能', '证书资质', '创新能力', '学习能力
 
 const initRadarChart = () => {
   if (!radarRef.value) return
-  if (radarInstance) radarInstance.dispose()
+  if (radarInstance) { radarInstance.dispose(); radarInstance = null }
 
-  radarInstance = echarts.init(radarRef.value)
+  const el = radarRef.value
+  // container may not have layout yet — wait for it
+  if (el.offsetWidth === 0 || el.offsetHeight === 0) {
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+        ro.disconnect()
+        if (!radarInstance && radarRef.value) {
+          radarInstance = echarts.init(radarRef.value)
+          updateRadarChart()
+        }
+      }
+    })
+    ro.observe(el)
+    return
+  }
+
+  radarInstance = echarts.init(el)
   updateRadarChart()
 }
 
@@ -427,6 +471,14 @@ const handleResize = () => radarInstance?.resize()
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+
+  // restore cached results if profile hasn't changed
+  const cached = loadFromCache()
+  if (cached && cached.results?.length && hashProfile(currentRadarData.value) === cached.profileHash) {
+    rankedResults.value = cached.results
+    selectedIndex.value = cached.index || 0
+    nextTick(() => requestAnimationFrame(() => initRadarChart()))
+  }
 })
 
 onUnmounted(() => {
@@ -446,6 +498,7 @@ watch(currentRadarData, (newVal, oldVal) => {
   if (JSON.stringify(newVal) !== JSON.stringify(oldVal) && rankedResults.value.length > 0) {
     rankedResults.value = []
     selectedIndex.value = 0
+    clearCache()
     if (radarInstance) {
       radarInstance.dispose()
       radarInstance = null
