@@ -45,10 +45,10 @@
                     </div>
                   </div>
                     <div class="header-right">
-                      <el-tooltip effect="dark" content="已開啟最高精準度解析" placement="top">
-                        <el-tag size="small" class="ai-mode-tag">
-                          智能模式
-                        </el-tag>
+                      <el-tooltip effect="dark" content="清空对话，重新填写信息" placement="top">
+                        <el-button size="small" class="reset-btn" @click="handleReset">
+                          重新填写
+                        </el-button>
                       </el-tooltip>
                     </div>
                 </div>
@@ -192,8 +192,18 @@
   </div>
 </template>
 
+<script>
+// 模块级状态 — SPA 内组件销毁重建时保留
+const _moduleState = {
+  chatMessages: [],
+  chatGreeted: false,
+  currentStepIndex: 0,
+  userInfo: { name: '', email: '', rawResumeText: '', school: '' },
+}
+</script>
+
 <script setup>
-import { ref, nextTick, computed, onMounted } from 'vue'
+import { ref, nextTick, computed, onMounted, onUnmounted } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { learningPlanApi } from '@/api/learningPlan'
@@ -288,19 +298,21 @@ const removeFile = () => {
 }
 
 const activeTab = ref('info')
-const isInfoFilled = ref(false)
 const loading = ref(false)
 const isStreaming = ref(false)
 const inputValue = ref('')
 const messageListRef = ref(null)
 const avatarUrl = ref('https://ui-avatars.com/api/?name=User&size=120&background=409EFF&color=fff')
 
-const userInfo = ref({ name: '', email: '', rawResumeText: '', school: '' })
+const userInfo = ref(_moduleState.userInfo)
 
-// --- 聊天状态 ---
-const currentStepIndex = ref(0)
-const chatMessages = ref([])
-const chatGreeted = ref(false)
+// isInfoFilled 不持久化，切回来时显示聊天界面
+const isInfoFilled = ref(false)
+
+// --- 聊天状态（使用模块级数据，SPA 内切换保留） ---
+const currentStepIndex = ref(_moduleState.currentStepIndex)
+const chatMessages = ref(_moduleState.chatMessages)
+const chatGreeted = ref(_moduleState.chatGreeted)
 
 // AI 初始问候
 const initChatGreeting = async () => {
@@ -337,12 +349,47 @@ const initChatGreeting = async () => {
 }
 
 onMounted(() => {
-  initChatGreeting()
+  // 已有聊天记录则跳过问候
+  if (chatMessages.value.length === 0) {
+    initChatGreeting()
+  }
+})
+
+// 组件销毁前同步状态到模块级变量
+onUnmounted(() => {
+  _moduleState.chatMessages = chatMessages.value
+  _moduleState.chatGreeted = chatGreeted.value
+  _moduleState.currentStepIndex = currentStepIndex.value
+  Object.assign(_moduleState.userInfo, userInfo.value)
 })
 
 // 🌟 修复核心：确保菜单选择逻辑能干净地切换 activeTab
 const handleMenuSelect = (index) => {
   activeTab.value = index
+}
+
+// 重新填写：清空对话，重置画像
+const handleReset = () => {
+  // 清空聊天记录
+  chatMessages.value = []
+  chatGreeted.value = false
+  currentStepIndex.value = 0
+  inputValue.value = ''
+  attachedFile.value = null
+  fileExtractedText.value = ''
+
+  // 重置画像数据
+  currentRadarData.value = [0, 0, 0, 0, 0, 0, 0]
+  dimensionDetailsRaw.value = null
+
+  // 清空模块级状态
+  _moduleState.chatMessages = []
+  _moduleState.chatGreeted = false
+  _moduleState.currentStepIndex = 0
+
+  // 重新发起问候
+  initChatGreeting()
+  ElMessage.success('已重置，请重新填写信息')
 }
 
 // 🌟 发送消息：真实 AI 驱动
@@ -436,9 +483,15 @@ const handleSend = async () => {
 }
 
 const saveAndContinue = () => {
+  // 检查已分析维度数量，少于4个不允许深度分析
+  const details = dimensionDetails.value
+  const analyzedCount = Object.values(details).filter(d => d.status === '已分析').length
+  if (analyzedCount < 4) {
+    ElMessage.warning(`当前仅有 ${analyzedCount} 个维度已分析，请至少补充到 4 个维度后再进行深度分析`)
+    return
+  }
   isInfoFilled.value = true
   ElMessage.success('简历保存成功！')
-  sessionStorage.setItem('is_profile_completed', 'true');
 }
 
 const scrollToBottom = async () => {
@@ -664,24 +717,25 @@ const completionLabel = computed(() => {
   }
 
   .header-right {
-    /* 🌟 智能模式 Tag 样式轻量化 */
-/* 在 .chat-header 的样式中找到 .ai-mode-tag 并修改 */
-    .ai-mode-tag {
-      /* 减小内边距：上下 0，左右 12px（原先可能是默认值） */
-      padding: 0 12px; 
-      height: 28px;        /* 固定高度让它看起来更精致 */
-      line-height: 26px;   /* 垂直居中 */
-      border-radius: 14px; /* 圆角设置为高度的一半，形成完美的胶囊形状 */
-      
+    .reset-btn {
+      padding: 0 12px;
+      height: 28px;
+      line-height: 26px;
+      border-radius: 14px;
       display: inline-flex;
       align-items: center;
-      gap: 4px;            /* 图标和文字之间的间距 */
-      
-      /* 针对图片中显示的紫色样式优化 */
+      gap: 4px;
       background: rgba(28, 61, 111, 0.08) !important;
       color: #161e5d !important;
       border: 1px solid rgba(118, 75, 162, 0.2) !important;
-      font-size: 13px;     /* 稍微调小字号更显高级 */
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: rgba(28, 61, 111, 0.15) !important;
+        transform: scale(1.05);
+      }
     }
   }
 }

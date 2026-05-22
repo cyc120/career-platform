@@ -283,7 +283,7 @@ const applyProfileData = () => {
   }
 
   // 计算综合得分：7维度加权平均
-  const weights = [0.20, 0.12, 0.15, 0.18, 0.10, 0.10, 0.15]
+  const weights = [0.18, 0.15, 0.18, 0.16, 0.10, 0.10, 0.13]
   let totalScore = 0
   let totalWeight = 0
   const skills = []

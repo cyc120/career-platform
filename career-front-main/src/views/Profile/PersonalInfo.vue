@@ -32,9 +32,9 @@
       <el-col :span="8">
         <el-card class="glass-card score-card">
           <div class="score-container">
-            <span class="label">综合评分</span>
+            <span class="label">综合评定</span>
             <div class="big-score">{{ competitivenessScore }}</div>
-            <el-tag size="small" class="score-tag" v-if="competitivenessScore > 0">综合竞争力评估</el-tag>
+            <el-tag size="small" class="score-tag" v-if="competitivenessScore > 0">{{ scoreLevel }}</el-tag>
           </div>
         </el-card>
       </el-col>
@@ -88,13 +88,13 @@
 </template>
 
 <script>
-// 模块级缓存 — 组件销毁重建也不会丢失
+// 模块级缓存 — SPA 内组件销毁重建时保留，页面刷新时重置
 let _cachedHash = ''
 let _cachedResults = null
 </script>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { School, Message, MagicStick } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
@@ -103,7 +103,7 @@ import { diagnosisApi } from '@/api/diagnosis'
 const props = defineProps(['userInfo'])
 const emit = defineEmits(['re-edit'])
 
-// 组件创建时检查缓存，决定初始状态
+// 组件创建时检查缓存
 const _hashNow = JSON.stringify(currentRadarData.value || []) + JSON.stringify(dimensionDetailsRaw.value || {})
 const _cacheHit = !!(_cachedResults && _cachedHash === _hashNow)
 
@@ -114,6 +114,17 @@ const wordCloudRef = ref(null)
 const completenessRef = ref(null)
 const competitivenessScore = ref(0)
 const aiSuggestions = ref('')
+
+// 综合评定等级
+const scoreLevel = computed(() => {
+  const s = competitivenessScore.value
+  if (s >= 75) return '优秀'
+  if (s >= 65) return '良好'
+  if (s >= 55) return '中等'
+  if (s >= 45) return '不错'
+  if (s > 0) return '需要进步'
+  return ''
+})
 
 let radarInstance = null
 let wordCloudInstance = null
@@ -160,7 +171,7 @@ const buildFromProfileData = async (forceApi = false) => {
   }
 
   // 综合评分 = 7维加权平均
-  const weights = [0.20, 0.12, 0.15, 0.18, 0.10, 0.10, 0.15]
+  const weights = [0.18, 0.15, 0.18, 0.16, 0.10, 0.10, 0.13]
   let totalScore = 0, totalWeight = 0
   DIM_NAMES.forEach((dim, i) => {
     const score = details?.[dim]?.score || radar?.[i] || 0
@@ -175,15 +186,27 @@ const buildFromProfileData = async (forceApi = false) => {
   }
 
   // 词云数据 — 从已分析维度中提取核心技能描述
-  wordCloudData.value = DIM_NAMES.map((dim, i) => {
+  const GENERIC_WORDS = new Set([
+    '创新能力', '学习能力', '专业技能', '实习能力', '抗压能力', '沟通能力', '证书',
+    '暂无信息', '暂无相关信息', '根据关联维度推断', '未提及',
+    '能力', '经验', '经历', '基础', '一定', '较好', '较强', '丰富',
+    '已分析', '待补充', '有', '的', '和', '等', '较', '有基础',
+  ])
+  const cloudItems = []
+  DIM_NAMES.forEach((dim, i) => {
     const d = details?.[dim]
     const score = d?.score || radar?.[i] || 0
-    if (!d || d.status !== '已分析' || score === 0) return null
+    if (!d || d.status !== '已分析' || score === 0) return
     const desc = d.desc || ''
-    if (!desc || desc === '暂无信息' || desc === '暂无相关信息' || desc === '根据关联维度推断') return null
-    const keywords = desc.split(/[,，、\s]+/).filter(k => k.length >= 2 && k.length <= 8)
-    return keywords.map(k => ({ name: k, value: score }))
-  }).filter(Boolean).flat()
+    // 从描述中提取关键词，过滤套话
+    if (desc && !GENERIC_WORDS.has(desc)) {
+      const keywords = desc.split(/[,，、\s]+/).filter(k =>
+        k.length >= 2 && k.length <= 10 && !GENERIC_WORDS.has(k)
+      )
+      keywords.forEach(k => cloudItems.push({ name: k, value: score }))
+    }
+  })
+  wordCloudData.value = cloudItems
 
   // AI 诊断报告 — 调用 diagnosis 智能体，生成300-400字深度分析
   try {
@@ -216,7 +239,7 @@ const buildFromProfileData = async (forceApi = false) => {
     analysisReport.value = report
   }
 
-  // 写入缓存
+  // 写入模块级缓存
   _cachedHash = hash
   _cachedResults = {
     analysisReport: analysisReport.value,
@@ -253,7 +276,7 @@ watch([currentRadarData, dimensionDetailsRaw], async () => {
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
 
-  // 缓存命中 → 直接渲染，不显示加载动画
+  // 检查模块级缓存
   if (_cachedResults && _cachedHash === computeHash()) {
     applyCached(_cachedResults)
     loading.value = false

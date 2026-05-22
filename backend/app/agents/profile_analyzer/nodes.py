@@ -7,24 +7,24 @@ from app.agents.profile_analyzer.prompts import EXTRACT_INFO_PROMPT, SCORE_DIMEN
 # RadarChart维度顺序
 DIMENSION_ORDER = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
 
-# EMA平滑系数
-SMOOTH_ALPHA = 0.6
-SCORE_THRESHOLD = 1
+# EMA平滑系数 — 降低新分权重，减少波动
+SMOOTH_ALPHA = 0.3
+SCORE_THRESHOLD = 2
 
 # ============================================================
 # 维度关联推断 — 高分维度自动提升关联的低分维度
 # ============================================================
-# (来源维度, 目标维度, 提升比例, 提升上限)
+# (来源维度, 目标维度, 提升比例, 提升上限) — 降低推断幅度，减少误差放大
 CORRELATIONS = [
-    ("实习能力", "专业技能", 0.25, 20),  # 实习→技能：实战提升技术
-    ("实习能力", "抗压能力", 0.25, 20),  # 实习→抗压：职场deadline和多任务
-    ("实习能力", "沟通能力", 0.15, 10),  # 实习→沟通：职场协作
-    ("创新能力", "专业技能", 0.20, 15),  # 创新→技能：技术突破需要扎实基础
-    ("创新能力", "学习能力", 0.20, 15),  # 创新→学习：探索新领域
-    ("创新能力", "抗压能力", 0.25, 20),  # 创新→抗压：竞赛/论文/项目高压
-    ("学习能力", "抗压能力", 0.15, 10),  # 学习→抗压：学业压力、持续学习
-    ("沟通能力", "抗压能力", 0.10, 10),  # 沟通→抗压：团队协调有压力
-    ("专业技能", "抗压能力", 0.10, 10),  # 技能→抗压：技术栈越多项目越多
+    ("实习能力", "专业技能", 0.15, 12),  # 实习→技能：实战提升技术
+    ("实习能力", "抗压能力", 0.15, 12),  # 实习→抗压：职场deadline和多任务
+    ("实习能力", "沟通能力", 0.10, 8),   # 实习→沟通：职场协作
+    ("创新能力", "专业技能", 0.12, 10),  # 创新→技能：技术突破需要扎实基础
+    ("创新能力", "学习能力", 0.12, 10),  # 创新→学习：探索新领域
+    ("创新能力", "抗压能力", 0.15, 12),  # 创新→抗压：竞赛/论文/项目高压
+    ("学习能力", "抗压能力", 0.10, 8),   # 学习→抗压：学业压力、持续学习
+    ("沟通能力", "抗压能力", 0.08, 6),   # 沟通→抗压：团队协调有压力
+    ("专业技能", "抗压能力", 0.08, 6),   # 技能→抗压：技术栈越多项目越多
 ]
 
 
@@ -47,16 +47,18 @@ def _apply_correlation_boosts(scores: dict) -> dict:
                 # 累加各来源的提升（多维度共同影响）
                 boosts[tgt_dim] = boosts.get(tgt_dim, 0) + actual_boost
 
-    # 总提升上限：不超过当前最高来源分数的40%
+    # 总提升上限：不超过当前最高来源分数的25%（降低以减少误差放大）
     for dim, total_boost in boosts.items():
         if dim in scores:
             max_src = max(
                 (scores.get(s, {}).get("score", 0) for s, t, _, _ in CORRELATIONS if t == dim),
                 default=0,
             )
-            capped_boost = min(total_boost, int(max_src * 0.4))
+            capped_boost = min(total_boost, int(max_src * 0.25))
             old_score = scores[dim]["score"]
-            scores[dim]["score"] = min(old_score + capped_boost, 100)
+            new_score = min(old_score + capped_boost, 100)
+            # 归一化到最近的5
+            scores[dim]["score"] = round(new_score / 5) * 5
             if scores[dim]["status"] != "已分析":
                 scores[dim]["status"] = "已分析"
                 scores[dim]["desc"] = "根据关联维度推断"
@@ -219,7 +221,7 @@ async def score_dimensions(state: ProfileAnalyzerState) -> dict:
     else:
         previous_scores = "（首次评估，无历史分数）"
 
-    llm = get_llm(temperature=0.2, max_tokens=1000)
+    llm = get_llm(temperature=0, max_tokens=1000)
     response = await llm.ainvoke([
         SystemMessage(content="输出纯JSON，不要加任何前缀说明。"),
         HumanMessage(content=SCORE_DIMENSIONS_PROMPT.format(
@@ -235,6 +237,13 @@ async def score_dimensions(state: ProfileAnalyzerState) -> dict:
 
     # 证书维度由算法评分，丢弃LLM可能臆造的证书分数
     scores.pop("证书", None)
+
+    # 分数归一化：四舍五入到最近的5，确保一致性
+    for dim in scores:
+        if isinstance(scores[dim], dict) and "score" in scores[dim]:
+            raw_score = scores[dim]["score"]
+            if isinstance(raw_score, (int, float)) and raw_score > 0:
+                scores[dim]["score"] = round(raw_score / 5) * 5
 
     return {"dimension_scores": scores}
 
@@ -289,12 +298,15 @@ async def format_output(state: ProfileAnalyzerState) -> dict:
 
             if old_score > 0:
                 blended = int(new_score * SMOOTH_ALPHA + old_score * (1 - SMOOTH_ALPHA))
+                # 归一化到最近的5
+                blended = round(blended / 5) * 5
                 if abs(blended - old_score) < SCORE_THRESHOLD:
                     final_score = old_score
                 else:
                     final_score = blended
             else:
-                final_score = new_score
+                # 归一化到最近的5
+                final_score = round(new_score / 5) * 5
 
             if new_status == "已分析" or old_detail.get("status") == "已分析":
                 final_status = "已分析"

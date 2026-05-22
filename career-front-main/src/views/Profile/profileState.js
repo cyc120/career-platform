@@ -1,10 +1,10 @@
 import { ref, computed } from 'vue'
 
-// 画像分析共享状态 — Index.vue 写入，AIReport.vue 读取
+const DIMENSIONS = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
+
+// 模块级变量 — SPA 内组件销毁重建时保留，页面刷新时重置
 export const currentRadarData = ref([0, 0, 0, 0, 0, 0, 0])
 export const dimensionDetailsRaw = ref(null)
-
-const DIMENSIONS = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
 
 export const dimensionDetails = computed(() => {
   if (dimensionDetailsRaw.value) return dimensionDetailsRaw.value
