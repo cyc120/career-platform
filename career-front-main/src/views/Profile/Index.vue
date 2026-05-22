@@ -45,41 +45,28 @@
                     </div>
                   </div>
                     <div class="header-right">
-                      <el-tooltip effect="dark" content="已開啟最高精準度解析" placement="top">
-                        <el-tag size="small" class="ai-mode-tag">
-                          智能模式
-                        </el-tag>
+                      <el-tooltip effect="dark" content="清空对话，重新填写信息" placement="top">
+                        <el-button size="small" class="reset-btn" @click="handleReset">
+                          重新填写
+                        </el-button>
                       </el-tooltip>
                     </div>
                 </div>
 
                 <div ref="messageListRef" class="message-list">
-                  <div v-for="msg in chatMessages" :key="msg.id" :class="['message-item', msg.role]">
+                  <div v-for="(msg, idx) in chatMessages" :key="msg.id" :class="['message-item', msg.role]">
                     <div class="message-avatar">
-                      <div v-if="msg.role === 'assistant'" class="ai-icon">
+                      <div v-if="msg.role === 'assistant'" :class="['ai-icon', { spinning: isStreaming && idx === chatMessages.length - 1 }]">
                         <el-icon><MagicStick /></el-icon>
                       </div>
                       <el-avatar v-else :size="36" src="https://ui-avatars.com/api/?name=User&background=667eea&color=fff" />
                     </div>
-                    
+
                     <div class="message-content-wrapper">
                       <div class="message-bubble">
                         {{ msg.content }}
                       </div>
                       <span class="message-time">刚刚</span>
-                    </div>
-                  </div>
-
-                  <div v-if="loading" class="message-item assistant">
-                    <div class="message-avatar">
-                      <div class="ai-icon spinning">
-                        <el-icon><Loading /></el-icon>
-                      </div>
-                    </div>
-                    <div class="message-content-wrapper">
-                      <div class="message-bubble loading-dots">
-                        <span></span><span></span><span></span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -95,29 +82,32 @@
                       @keydown.enter.prevent="handleSend"
                     />
                     <div class="input-footer">
-                      <el-upload 
-                        action="#" 
-                        :auto-upload="false" 
+                      <el-upload
+                        action="#"
+                        :auto-upload="false"
                         :show-file-list="false"
                         :on-change="handleFileChange"
+                        :disabled="fileParsing"
                         accept=".pdf,.doc,.docx,.txt"
                       >
-                        <el-button link icon="Upload">
-                          {{ attachedFile ? '更换附件' : '上传附件' }}
+                        <el-button link icon="Upload" :disabled="fileParsing">
+                          {{ fileParsing ? '解析中...' : (attachedFile ? '更换附件' : '上传附件') }}
                         </el-button>
                       </el-upload>
-                      
+
                       <div v-if="attachedFile" class="file-tag">
-                        <el-tag closable size="small" @close="removeFile">
-                          {{ attachedFile.name }}
+                        <el-tag :type="fileParsing ? 'warning' : 'success'" closable size="small" :disable-transitions="false" @close="removeFile">
+                          <span v-if="fileParsing" class="parsing-indicator"></span>
+                          {{ fileParsing ? `正在解析 ${attachedFile.name}...` : attachedFile.name }}
                         </el-tag>
                       </div>
 
-                      <el-button 
-                        type="primary" 
-                        circle 
-                        icon="Promotion" 
-                        @click="handleSend" 
+                      <el-button
+                        type="primary"
+                        circle
+                        icon="Promotion"
+                        @click="handleSend"
+                        :disabled="fileParsing || loading"
                         class="send-btn"
                       />
                     </div>
@@ -202,16 +192,22 @@
   </div>
 </template>
 
+<script>
+// 模块级状态 — SPA 内组件销毁重建时保留
+const _moduleState = {
+  chatMessages: [],
+  chatGreeted: false,
+  currentStepIndex: 0,
+  userInfo: { name: '', email: '', rawResumeText: '', school: '' },
+}
+</script>
+
 <script setup>
-import { ref, nextTick, computed, onMounted } from 'vue'
+import { ref, nextTick, computed, onMounted, onUnmounted } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { learningPlanApi } from '@/api/learningPlan'
 import * as mammoth from 'mammoth'
-import * as pdfjsLib from 'pdfjs-dist'
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // 导入你的子组件
 import PersonalInfo from './PersonalInfo.vue'
@@ -220,8 +216,10 @@ import GrowthTracker from './GrowthTracker.vue'
 import PolishAndExport from './PolishAndExport.vue'
 import FavoriteJobs from './FavoriteJobs.vue'
 import RadarChart from '../../components/RadarChart.vue'
+import { currentRadarData, dimensionDetailsRaw, dimensionDetails } from './profileState.js'
 const attachedFile = ref(null) // 存储文件对象
 const fileExtractedText = ref('') // 从文件中提取的文本
+const fileParsing = ref(false) // 文件解析中
 
 // 🌟 从文件中提取文本内容
 const extractFileText = async (file) => {
@@ -231,25 +229,39 @@ const extractFileText = async (file) => {
     return await file.text()
   }
 
-  if (ext === 'pdf') {
-    const buffer = await file.arrayBuffer()
-    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
-    const pages = []
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const content = await page.getTextContent()
-      pages.push(content.items.map(item => item.str).join(' '))
-    }
-    return pages.join('\n')
-  }
-
-  if (ext === 'docx' || ext === 'doc') {
+  if (ext === 'docx') {
     const buffer = await file.arrayBuffer()
     const result = await mammoth.extractRawText({ arrayBuffer: buffer })
     return result.value
   }
 
-  return ''
+  // PDF / doc 等格式：转 base64 发给后端解析
+  if (ext === 'pdf' || ext === 'doc') {
+    const buffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    const base64 = btoa(binary)
+
+    const token = localStorage.getItem('access_token')
+    const resp = await fetch('http://localhost:8000/api/v1/learning-plan/parse-file', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ filename: file.name, base64 }),
+    })
+
+    if (!resp.ok) throw new Error('文件解析服务异常')
+    const data = await resp.json()
+    if (!data.success) throw new Error(data.error || '解析失败')
+    return data.text
+  }
+
+  throw new Error(`不支持的文件格式: .${ext}`)
 }
 
 // 🌟 处理文件选择逻辑
@@ -262,14 +274,19 @@ const handleFileChange = async (file) => {
 
   attachedFile.value = file.raw
   fileExtractedText.value = ''
+  fileParsing.value = true
 
   try {
     const text = await extractFileText(file.raw)
     fileExtractedText.value = text
-    ElMessage.success(`已添加附件: ${file.name} (${text.length}字)`)
+    ElMessage.success(`已解析附件: ${file.name}，${text.length}字`)
   } catch (err) {
     console.error('[Upload] File extraction failed:', err)
-    ElMessage.warning('文件解析失败，将仅发送文件名')
+    ElMessage.error(err.message || '文件解析失败')
+    attachedFile.value = null
+    fileExtractedText.value = ''
+  } finally {
+    fileParsing.value = false
   }
 }
 
@@ -277,23 +294,25 @@ const handleFileChange = async (file) => {
 const removeFile = () => {
   attachedFile.value = null
   fileExtractedText.value = ''
+  fileParsing.value = false
 }
 
 const activeTab = ref('info')
-const isInfoFilled = ref(false)
 const loading = ref(false)
+const isStreaming = ref(false)
 const inputValue = ref('')
 const messageListRef = ref(null)
 const avatarUrl = ref('https://ui-avatars.com/api/?name=User&size=120&background=409EFF&color=fff')
 
-const userInfo = ref({ name: '', email: '', rawResumeText: '', school: '' })
+const userInfo = ref(_moduleState.userInfo)
 
-// --- 聊天状态 ---
-const currentStepIndex = ref(0)
-const currentRadarData = ref([0, 0, 0, 0, 0, 0, 0])
-const dimensionDetailsRaw = ref(null)
-const chatMessages = ref([])
-const chatGreeted = ref(false)
+// isInfoFilled 不持久化，切回来时显示聊天界面
+const isInfoFilled = ref(false)
+
+// --- 聊天状态（使用模块级数据，SPA 内切换保留） ---
+const currentStepIndex = ref(_moduleState.currentStepIndex)
+const chatMessages = ref(_moduleState.chatMessages)
+const chatGreeted = ref(_moduleState.chatGreeted)
 
 // AI 初始问候
 const initChatGreeting = async () => {
@@ -330,7 +349,18 @@ const initChatGreeting = async () => {
 }
 
 onMounted(() => {
-  initChatGreeting()
+  // 已有聊天记录则跳过问候
+  if (chatMessages.value.length === 0) {
+    initChatGreeting()
+  }
+})
+
+// 组件销毁前同步状态到模块级变量
+onUnmounted(() => {
+  _moduleState.chatMessages = chatMessages.value
+  _moduleState.chatGreeted = chatGreeted.value
+  _moduleState.currentStepIndex = currentStepIndex.value
+  Object.assign(_moduleState.userInfo, userInfo.value)
 })
 
 // 🌟 修复核心：确保菜单选择逻辑能干净地切换 activeTab
@@ -338,8 +368,36 @@ const handleMenuSelect = (index) => {
   activeTab.value = index
 }
 
+// 重新填写：清空对话，重置画像
+const handleReset = () => {
+  // 清空聊天记录
+  chatMessages.value = []
+  chatGreeted.value = false
+  currentStepIndex.value = 0
+  inputValue.value = ''
+  attachedFile.value = null
+  fileExtractedText.value = ''
+
+  // 重置画像数据
+  currentRadarData.value = [0, 0, 0, 0, 0, 0, 0]
+  dimensionDetailsRaw.value = null
+
+  // 清空模块级状态
+  _moduleState.chatMessages = []
+  _moduleState.chatGreeted = false
+  _moduleState.currentStepIndex = 0
+
+  // 重新发起问候
+  initChatGreeting()
+  ElMessage.success('已重置，请重新填写信息')
+}
+
 // 🌟 发送消息：真实 AI 驱动
 const handleSend = async () => {
+  if (fileParsing.value) {
+    ElMessage.warning('附件正在解析中，请稍后')
+    return
+  }
   if (!inputValue.value.trim() && !attachedFile.value) {
     ElMessage.warning('请输入内容或上传简历附件')
     return
@@ -366,16 +424,20 @@ const handleSend = async () => {
   attachedFile.value = null
   fileExtractedText.value = ''
 
+  // 推送空的 AI 消息占位，后续逐字填充
+  const aiMsg = { id: Date.now() + 1, role: 'assistant', content: '' }
+  chatMessages.value.push(aiMsg)
+
   loading.value = true
+  isStreaming.value = true
   await scrollToBottom()
 
   try {
     const history = chatMessages.value
       .filter(m => m.role === 'user' || m.role === 'assistant')
-      .slice(0, -1)
+      .slice(0, -2) // exclude current user msg and empty assistant msg
       .map(m => ({ role: m.role, content: m.content }))
 
-    // 拼接用户输入 + 文件提取文本
     const userTyped = displayContent.replace(/\[附件:.*?\]/g, '').trim()
     let userText = userTyped
     if (extractedText) {
@@ -383,45 +445,53 @@ const handleSend = async () => {
         ? `${userTyped}\n\n以下是我的简历内容：\n${extractedText}`
         : `以下是我的简历内容：\n${extractedText}`
     }
-    console.log('[Coach] Sending message:', userText.slice(0, 100), '...')
-    const resp = await learningPlanApi.coach(userText || '请分析我的简历', history, {
-      previous_radar_data: currentRadarData.value,
-      previous_details: dimensionDetailsRaw.value,
-    })
-    console.log('[Coach] Response:', resp.status, resp.data)
-    const reply = resp.data?.reply
 
-    chatMessages.value.push({
-      id: Date.now(),
-      role: 'assistant',
-      content: reply || '抱歉，暂时无法回复。'
-    })
+    await learningPlanApi.coachStream(
+      userText || '请分析我的简历',
+      history,
+      { previous_radar_data: currentRadarData.value, previous_details: dimensionDetailsRaw.value },
+      // onToken: 逐字追加
+      (token) => {
+        aiMsg.content += token
+        scrollToBottom()
+      },
+      // onRadar: 更新画像
+      (radar) => {
+        console.log('[Coach] Radar event received:', radar)
+        if (radar.radar_data) currentRadarData.value = radar.radar_data
+        if (radar.dimension_details && Object.keys(radar.dimension_details).length > 0) {
+          dimensionDetailsRaw.value = radar.dimension_details
+          currentStepIndex.value = 2
+        }
+        console.log('[Coach] Radar updated, currentRadarData:', currentRadarData.value)
+      },
+      // onDone
+      null
+    )
 
-    // 使用AI画像分析结果更新雷达图
-    if (resp.data?.radar_data) {
-      currentRadarData.value = resp.data.radar_data
-    }
-    if (resp.data?.dimension_details && Object.keys(resp.data.dimension_details).length > 0) {
-      dimensionDetailsRaw.value = resp.data.dimension_details
-      currentStepIndex.value = 2
+    if (!aiMsg.content) {
+      aiMsg.content = '抱歉，暂时无法回复。'
     }
   } catch (err) {
     console.error('[Coach] Send failed:', err)
-    chatMessages.value.push({
-      id: Date.now(),
-      role: 'assistant',
-      content: '抱歉，AI 服务暂时不可用，请稍后再试。'
-    })
+    aiMsg.content = aiMsg.content || '抱歉，AI 服务暂时不可用，请稍后再试。'
   } finally {
     loading.value = false
+    isStreaming.value = false
     await scrollToBottom()
   }
 }
 
 const saveAndContinue = () => {
+  // 检查已分析维度数量，少于4个不允许深度分析
+  const details = dimensionDetails.value
+  const analyzedCount = Object.values(details).filter(d => d.status === '已分析').length
+  if (analyzedCount < 4) {
+    ElMessage.warning(`当前仅有 ${analyzedCount} 个维度已分析，请至少补充到 4 个维度后再进行深度分析`)
+    return
+  }
   isInfoFilled.value = true
   ElMessage.success('简历保存成功！')
-  sessionStorage.setItem('is_profile_completed', 'true');
 }
 
 const scrollToBottom = async () => {
@@ -429,13 +499,7 @@ const scrollToBottom = async () => {
   if (messageListRef.value) messageListRef.value.scrollTop = messageListRef.value.scrollHeight
 }
 
-const dimensionDetails = computed(() => {
-  const dimensions = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
-  if (dimensionDetailsRaw.value) {
-    return dimensionDetailsRaw.value
-  }
-  return Object.fromEntries(dimensions.map(d => [d, { status: '待采集', desc: '请通过对话提供信息', type: 'info' }]))
-})
+// dimensionDetails 已从 profileState.js 导入
 
 const analyzedCount = computed(() => {
   const details = dimensionDetails.value
@@ -653,24 +717,25 @@ const completionLabel = computed(() => {
   }
 
   .header-right {
-    /* 🌟 智能模式 Tag 样式轻量化 */
-/* 在 .chat-header 的样式中找到 .ai-mode-tag 并修改 */
-    .ai-mode-tag {
-      /* 减小内边距：上下 0，左右 12px（原先可能是默认值） */
-      padding: 0 12px; 
-      height: 28px;        /* 固定高度让它看起来更精致 */
-      line-height: 26px;   /* 垂直居中 */
-      border-radius: 14px; /* 圆角设置为高度的一半，形成完美的胶囊形状 */
-      
+    .reset-btn {
+      padding: 0 12px;
+      height: 28px;
+      line-height: 26px;
+      border-radius: 14px;
       display: inline-flex;
       align-items: center;
-      gap: 4px;            /* 图标和文字之间的间距 */
-      
-      /* 针对图片中显示的紫色样式优化 */
+      gap: 4px;
       background: rgba(28, 61, 111, 0.08) !important;
       color: #161e5d !important;
       border: 1px solid rgba(118, 75, 162, 0.2) !important;
-      font-size: 13px;     /* 稍微调小字号更显高级 */
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: rgba(28, 61, 111, 0.15) !important;
+        transform: scale(1.05);
+      }
     }
   }
 }
@@ -937,12 +1002,31 @@ const completionLabel = computed(() => {
     flex: 1; // 让文件名占据剩余空间
     display: flex;
     align-items: center;
-    
+
     :deep(.el-tag) {
       background: rgba(102, 126, 234, 0.1);
       border: 1px solid rgba(102, 126, 234, 0.2);
       color: #4f46e5;
     }
+    :deep(.el-tag--warning) {
+      background: rgba(230, 162, 60, 0.1);
+      border: 1px solid rgba(230, 162, 60, 0.3);
+      color: #e6a23c;
+    }
+  }
+  .parsing-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(230, 162, 60, 0.3);
+    border-top-color: #e6a23c;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
   /* 发送按钮美化 */
   .send-btn {

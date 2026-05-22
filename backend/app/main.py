@@ -9,7 +9,7 @@ from app.middleware.rate_limiter import RateLimitMiddleware
 
 # API routers
 from app.api.v1 import (
-    auth, agents, resume, matching, career_plan, learning_plan, jobs, favorites,
+    auth, agents, resume, matching, career_plan, learning_plan, jobs, favorites, diagnosis,
 )
 
 
@@ -121,6 +121,7 @@ app.include_router(career_plan.router, prefix="/api/v1/career-plan", tags=["Care
 app.include_router(learning_plan.router, prefix="/api/v1/learning-plan", tags=["Learning Plan"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
 app.include_router(favorites.router, prefix="/api/v1/favorites", tags=["Favorites"])
+app.include_router(diagnosis.router, prefix="/api/v1/diagnosis", tags=["Diagnosis"])
 
 
 @app.get("/api/health")

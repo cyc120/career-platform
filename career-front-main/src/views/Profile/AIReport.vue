@@ -159,6 +159,7 @@ import {
 import { ElMessage } from 'element-plus'
 import { matchingApi } from '@/api/matching'
 import { careerPlanApi } from '@/api/careerPlan'
+import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
 
 // ==================== 状态变量 ====================
 const activeTab = ref('matching')
@@ -266,6 +267,69 @@ const fetchMatchingData = async () => {
     ElMessage.warning('获取匹配数据失败')
   }
 }
+
+// 画像分析数据 → 综合评分 + 维度详情
+const DIM_NAMES = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
+const applyProfileData = () => {
+  // Read directly from the source ref, not the computed
+  const raw = dimensionDetailsRaw.value
+  const details = raw && Object.keys(raw).length > 0
+    ? raw
+    : Object.fromEntries(DIM_NAMES.map(d => [d, { status: '待采集', desc: '请通过对话提供信息', type: 'info' }]))
+  console.log('[AIReport] applyProfileData called, raw:', raw ? Object.keys(raw) : 'null')
+  if (!raw || Object.keys(raw).length === 0) {
+    console.log('[AIReport] No profile data yet, skipping')
+    return
+  }
+
+  // 计算综合得分：7维度加权平均
+  const weights = [0.18, 0.15, 0.18, 0.16, 0.10, 0.10, 0.13]
+  let totalScore = 0
+  let totalWeight = 0
+  const skills = []
+
+  DIM_NAMES.forEach((dim, i) => {
+    const d = details[dim]
+    const score = d?.score || 0
+    if (score > 0) {
+      totalScore += score * weights[i]
+      totalWeight += weights[i]
+    }
+    skills.push({
+      name: dim,
+      score,
+      comment: d?.desc || '暂无信息',
+      status: d?.status || '待补充',
+    })
+  })
+
+  const avgScore = totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0
+
+  // 只要有1个维度已分析就更新（画像数据优先级高于匹配数据）
+  const analyzedCount = skills.filter(s => s.status === '已分析').length
+  console.log('[AIReport] analyzedCount:', analyzedCount, 'avgScore:', avgScore, 'skills:', skills.map(s => `${s.name}:${s.score}`))
+  if (analyzedCount >= 1) {
+    overallScore.value = avgScore
+    skillDetails.value = skills
+
+    // 生成综合评语
+    const strong = skills.filter(s => s.score >= 60).map(s => s.name)
+    const weak = skills.filter(s => s.score > 0 && s.score < 40).map(s => s.name)
+    const pending = skills.filter(s => s.score === 0).map(s => s.name)
+
+    let summary = `综合得分${avgScore}分。`
+    if (strong.length) summary += `优势维度：${strong.join('、')}。`
+    if (weak.length) summary += `待提升：${weak.join('、')}。`
+    if (pending.length) summary += `未采集：${pending.join('、')}，建议在职能助手中补充。`
+    aiSummary.value = summary
+  }
+}
+
+// 监听画像数据变化 — watch dimensionDetailsRaw directly for reliable reactivity
+watch(dimensionDetailsRaw, (newVal) => {
+  console.log('[AIReport] dimensionDetailsRaw changed:', newVal ? Object.keys(newVal) : 'null')
+  applyProfileData()
+}, { deep: true })
 
 // 调用 career_planner agent
 const fetchPlanningData = async () => {
@@ -669,7 +733,10 @@ onMounted(async () => {
   // 2. 并行获取人岗匹配 + 职业规划数据
   await Promise.all([fetchMatchingData(), fetchPlanningData()])
 
-  // 3. 初始化图表
+  // 3. 画像分析数据覆盖（优先级更高）
+  applyProfileData()
+
+  // 4. 初始化图表
   initAllCharts()
 
   window.addEventListener('resize', handleResize)
