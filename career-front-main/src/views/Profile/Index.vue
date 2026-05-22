@@ -314,38 +314,21 @@ const currentStepIndex = ref(_moduleState.currentStepIndex)
 const chatMessages = ref(_moduleState.chatMessages)
 const chatGreeted = ref(_moduleState.chatGreeted)
 
-// AI 初始问候
-const initChatGreeting = async () => {
+// AI 初始问候 — 固定开场白
+const GREETING_TEXT = `你好！我是你的职能助手 👋
+
+我可以帮你分析职业画像、评估岗位匹配度。请告诉我：
+
+1. 你的学校和专业是什么？
+2. 你目前大几 / 研几？
+3. 你的目标方向是什么？（如前端、后端、算法、AI、产品等）
+
+直接回复即可，我会根据你的信息生成专属画像分析。`
+
+const initChatGreeting = () => {
   if (chatGreeted.value) return
   chatGreeted.value = true
-  loading.value = true
-  try {
-    console.log('[Coach] Sending greeting request...')
-    const resp = await learningPlanApi.coach(
-      '新用户首次对话。用一句话打招呼，然后问：什么学校、什么方向（前端/后端/算法/AI等）、大几。', []
-    )
-    console.log('[Coach] Response status:', resp.status)
-    console.log('[Coach] Response data:', resp.data)
-    const reply = resp.data?.reply
-    if (reply) {
-      chatMessages.value.push({ id: Date.now(), role: 'assistant', content: reply })
-      console.log('[Coach] Greeting added to chat')
-    } else {
-      console.warn('[Coach] No reply field in response:', resp.data)
-    }
-    // 处理问候阶段的画像数据
-    if (resp.data?.radar_data) {
-      currentRadarData.value = resp.data.radar_data
-    }
-    if (resp.data?.dimension_details && Object.keys(resp.data.dimension_details).length > 0) {
-      dimensionDetailsRaw.value = resp.data.dimension_details
-      currentStepIndex.value = 2
-    }
-  } catch (err) {
-    console.error('[Coach] Greeting failed:', err)
-  } finally {
-    loading.value = false
-  }
+  chatMessages.value.push({ id: Date.now(), role: 'assistant', content: GREETING_TEXT })
 }
 
 onMounted(() => {

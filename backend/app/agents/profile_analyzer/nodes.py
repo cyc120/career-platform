@@ -14,18 +14,80 @@ SCORE_THRESHOLD = 2
 # ============================================================
 # 维度关联推断 — 高分维度自动提升关联的低分维度
 # ============================================================
-# (来源维度, 目标维度, 提升比例, 提升上限) — 降低推断幅度，减少误差放大
+# (来源维度, 目标维度, 提升比例, 提升上限)
 CORRELATIONS = [
-    ("实习能力", "专业技能", 0.15, 12),  # 实习→技能：实战提升技术
-    ("实习能力", "抗压能力", 0.15, 12),  # 实习→抗压：职场deadline和多任务
-    ("实习能力", "沟通能力", 0.10, 8),   # 实习→沟通：职场协作
+    # 实习能力 → 其他维度（实战经验的辐射效应）
+    ("实习能力", "专业技能", 0.18, 15),  # 实习→技能：实战提升技术
+    ("实习能力", "抗压能力", 0.30, 25),  # 实习→抗压：职场deadline和多任务
+    ("实习能力", "沟通能力", 0.12, 10),  # 实习→沟通：职场协作
+    ("实习能力", "创新能力", 0.12, 10),  # 实习→创新：项目实践中产生创新
+    ("实习能力", "学习能力", 0.10, 8),   # 实习→学习：项目驱动的快速学习
+
+    # 创新能力 → 其他维度
     ("创新能力", "专业技能", 0.12, 10),  # 创新→技能：技术突破需要扎实基础
-    ("创新能力", "学习能力", 0.12, 10),  # 创新→学习：探索新领域
-    ("创新能力", "抗压能力", 0.15, 12),  # 创新→抗压：竞赛/论文/项目高压
-    ("学习能力", "抗压能力", 0.10, 8),   # 学习→抗压：学业压力、持续学习
-    ("沟通能力", "抗压能力", 0.08, 6),   # 沟通→抗压：团队协调有压力
-    ("专业技能", "抗压能力", 0.08, 6),   # 技能→抗压：技术栈越多项目越多
+    ("创新能力", "学习能力", 0.15, 12),  # 创新→学习：探索新领域
+    ("创新能力", "抗压能力", 0.28, 22),  # 创新→抗压：竞赛/论文/项目高压
+    ("创新能力", "实习能力", 0.10, 8),   # 创新→实习：竞赛/开源项目等同实战
+
+    # 学习能力 → 其他维度
+    ("学习能力", "抗压能力", 0.20, 18),  # 学习→抗压：学业压力、持续学习
+
+    # 沟通能力 → 抗压能力
+    ("沟通能力", "抗压能力", 0.18, 15),  # 沟通→抗压：团队协调有压力
+
+    # 专业技能 → 抗压能力
+    ("专业技能", "抗压能力", 0.18, 15),  # 技能→抗压：技术栈越多项目越多
 ]
+
+# ============================================================
+# 基准分兜底 — 根据提取信息中的关键词确保最低分数
+# ============================================================
+_TECH_KEYWORDS = {"python", "java", "c++", "javascript", "go", "rust", "typescript",
+                  "django", "flask", "spring", "react", "vue", "angular", "node",
+                  "mysql", "redis", "mongodb", "postgresql", "docker", "kubernetes",
+                  "linux", "git", "html", "css", "sql", "nosql", "nginx", "aws",
+                  "编程", "开发", "技术栈", "框架", "数据库", "服务器", "前端", "后端",
+                  "算法", "数据结构", "操作系统", "计算机网络", "计算机"}
+_SCHOOL_KEYWORDS = {"大学", "学院", "本科", "硕士", "博士", "在读", "学生", "毕业",
+                    "学校", "高校", "985", "211", "双一流", "专业", "计算机系"}
+_PROJECT_KEYWORDS = {"项目", "课设", "课程设计", "毕设", "毕业设计", "实习", "兼职",
+                     "开发了", "做了", "实现了", "搭建了", "独立完成", "负责"}
+_TEAM_KEYWORDS = {"团队", "小组", "合作", "协作", "组长", "队长", "带领", "组织",
+                  "汇报", "演讲", "答辩", "助教", "社团", "学生会"}
+
+
+def _detect_baselines(info_lower: str, info_raw: str) -> dict:
+    """根据提取信息中的关键词，返回各维度的最低保障分数。"""
+    baselines = {}
+
+    # 专业技能：提到任何技术关键词 → 至少50
+    tech_hits = sum(1 for kw in _TECH_KEYWORDS if kw in info_lower)
+    if tech_hits >= 3:
+        baselines["专业技能"] = 65
+    elif tech_hits >= 1:
+        baselines["专业技能"] = 50
+
+    # 学习能力：提到学校/在读 → 至少55
+    if any(kw in info_raw for kw in _SCHOOL_KEYWORDS):
+        baselines["学习能力"] = 55
+
+    # 实习能力：提到项目/实习 → 至少55
+    if any(kw in info_raw for kw in _PROJECT_KEYWORDS):
+        baselines["实习能力"] = 55
+
+    # 创新能力：提到项目开发 → 至少40
+    if any(kw in info_raw for kw in _PROJECT_KEYWORDS):
+        baselines["创新能力"] = 40
+
+    # 沟通能力：提到团队/协作 → 至少55
+    if any(kw in info_raw for kw in _TEAM_KEYWORDS):
+        baselines["沟通能力"] = 55
+
+    # 抗压能力：只要有学业/项目信息 → 至少40
+    if any(kw in info_raw for kw in _SCHOOL_KEYWORDS) or any(kw in info_raw for kw in _PROJECT_KEYWORDS):
+        baselines["抗压能力"] = 40
+
+    return baselines
 
 
 def _apply_correlation_boosts(scores: dict) -> dict:
@@ -39,22 +101,22 @@ def _apply_correlation_boosts(scores: dict) -> dict:
     for src_dim, tgt_dim, ratio, cap in CORRELATIONS:
         src_score = scores.get(src_dim, {}).get("score", 0)
         tgt_score = scores.get(tgt_dim, {}).get("score", 0)
-        if src_score > 20 and tgt_score < src_score:
+        if src_score > 15 and tgt_score < src_score * 1.2:
             boost = min(int(src_score * ratio), cap)
-            max_allowed = src_score - tgt_score
+            # 允许目标分数推断到来源分数的90%（关联维度可合理超越单一来源）
+            max_allowed = int(src_score * 0.9) - tgt_score
             actual_boost = min(boost, max(max_allowed, 0))
             if actual_boost > 0:
-                # 累加各来源的提升（多维度共同影响）
                 boosts[tgt_dim] = boosts.get(tgt_dim, 0) + actual_boost
 
-    # 总提升上限：不超过当前最高来源分数的25%（降低以减少误差放大）
+    # 总提升上限：不超过最高来源分数的40%
     for dim, total_boost in boosts.items():
         if dim in scores:
             max_src = max(
                 (scores.get(s, {}).get("score", 0) for s, t, _, _ in CORRELATIONS if t == dim),
                 default=0,
             )
-            capped_boost = min(total_boost, int(max_src * 0.25))
+            capped_boost = min(total_boost, int(max_src * 0.40))
             old_score = scores[dim]["score"]
             new_score = min(old_score + capped_boost, 100)
             # 归一化到最近的5
@@ -244,6 +306,14 @@ async def score_dimensions(state: ProfileAnalyzerState) -> dict:
             raw_score = scores[dim]["score"]
             if isinstance(raw_score, (int, float)) and raw_score > 0:
                 scores[dim]["score"] = round(raw_score / 5) * 5
+
+    # 基准分兜底：根据提取信息中的关键词，确保LLM不会给过低分数
+    info_lower = extracted_info.lower() if extracted_info else ""
+    baselines = _detect_baselines(info_lower, extracted_info or "")
+    for dim, min_score in baselines.items():
+        cur = scores.get(dim, {}).get("score", 0)
+        if 0 < cur < min_score:
+            scores[dim]["score"] = min_score
 
     return {"dimension_scores": scores}
 

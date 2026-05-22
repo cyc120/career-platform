@@ -58,7 +58,11 @@
       <el-col :span="8">
         <el-card class="glass-card detail-card">
           <template #header><div class="card-header">技能词云</div></template>
-          <div v-show="!loading" ref="wordCloudRef" class="chart-container"></div>
+          <div v-if="!loading && wordCloudData.length >= 3" ref="wordCloudRef" class="chart-container"></div>
+          <div v-else-if="!loading" class="cloud-empty">
+            <span class="cloud-empty-icon">💡</span>
+            <span>技能有待提升哦</span>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -118,10 +122,10 @@ const aiSuggestions = ref('')
 // 综合评定等级
 const scoreLevel = computed(() => {
   const s = competitivenessScore.value
-  if (s >= 75) return '优秀'
-  if (s >= 65) return '良好'
+  if (s >= 80) return '优秀'
+  if (s >= 68) return '良好'
   if (s >= 55) return '中等'
-  if (s >= 45) return '不错'
+  if (s >= 42) return '不错'
   if (s > 0) return '需要进步'
   return ''
 })
@@ -185,28 +189,41 @@ const buildFromProfileData = async (forceApi = false) => {
     displayPercentage.value = Math.round((analyzed / 7) * 100)
   }
 
-  // 词云数据 — 从已分析维度中提取核心技能描述
+  // 词云数据 — 只提取具体的技能/特长/成果关键词，不显示维度套话
   const GENERIC_WORDS = new Set([
     '创新能力', '学习能力', '专业技能', '实习能力', '抗压能力', '沟通能力', '证书',
     '暂无信息', '暂无相关信息', '根据关联维度推断', '未提及',
-    '能力', '经验', '经历', '基础', '一定', '较好', '较强', '丰富',
+    '能力', '基础', '一定', '较好', '较强', '丰富',
     '已分析', '待补充', '有', '的', '和', '等', '较', '有基础',
+    '方面', '方面表现', '掌握', '熟悉', '了解', '使用', '进行',
+    '技术栈', '创新力', '学习力', '实战力', '抗压力', '沟通力', '资质',
+    '突出', '扎实', '优秀', '良好', '一般', '项目经验', '实习经验',
   ])
   const cloudItems = []
+  const seen = new Set()
   DIM_NAMES.forEach((dim, i) => {
     const d = details?.[dim]
     const score = d?.score || radar?.[i] || 0
     if (!d || d.status !== '已分析' || score === 0) return
     const desc = d.desc || ''
-    // 从描述中提取关键词，过滤套话
     if (desc && !GENERIC_WORDS.has(desc)) {
-      const keywords = desc.split(/[,，、\s]+/).filter(k =>
-        k.length >= 2 && k.length <= 10 && !GENERIC_WORDS.has(k)
-      )
-      keywords.forEach(k => cloudItems.push({ name: k, value: score }))
+      const keywords = desc.split(/[,，、\s;；。、]+/).filter(k => {
+        const clean = k.replace(/[。.（）()：:]/g, '').trim()
+        return clean.length >= 2 && clean.length <= 10
+          && !GENERIC_WORDS.has(clean) && !seen.has(clean)
+      })
+      keywords.forEach(k => {
+        const clean = k.replace(/[。.（）()：:]/g, '').trim()
+        if (clean && !seen.has(clean)) {
+          seen.add(clean)
+          cloudItems.push({ name: clean, value: score })
+        }
+      })
     }
   })
-  wordCloudData.value = cloudItems
+  // 按分数排序，取前8个最突出的
+  cloudItems.sort((a, b) => b.value - a.value)
+  wordCloudData.value = cloudItems.slice(0, 8)
 
   // AI 诊断报告 — 调用 diagnosis 智能体，生成300-400字深度分析
   try {
@@ -222,17 +239,19 @@ const buildFromProfileData = async (forceApi = false) => {
     const strong = DIM_NAMES.filter(d => (details?.[d]?.score || 0) >= 60)
     const weak = DIM_NAMES.filter(d => { const s = details?.[d]?.score || 0; return s > 0 && s < 40 })
     const pending = DIM_NAMES.filter(d => !details?.[d] || details[d].score === 0)
+    const allScores = DIM_NAMES.map(d => details?.[d]?.score || 0).filter(s => s > 0)
+    const avg = allScores.length ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : 0
     let report = ''
     if (analyzed.length) {
-      report += '根据画像分析，'
-      if (strong.length) report += `你在${strong.join('、')}方面表现突出。`
+      report += `整体竞争力${avg >= 65 ? '较强' : avg >= 50 ? '中等' : '有待提升'}，已分析${analyzed.length}个维度。`
+      if (strong.length) {
+        const strongDescs = strong.map(d => {
+          const desc = details[d]?.desc || ''
+          return desc && desc !== '暂无相关信息' && desc !== '根据关联维度推断' ? `${d}（${desc}）` : d
+        })
+        report += `优势集中在${strongDescs.join('、')}。`
+      }
       if (weak.length) report += `${weak.join('、')}方面仍有提升空间。`
-      analyzed.forEach(d => {
-        const desc = details[d].desc
-        if (desc && desc !== '暂无信息' && desc !== '暂无相关信息' && desc !== '根据关联维度推断') {
-          report += `${d}方面${desc}。`
-        }
-      })
     }
     if (pending.length) report += `尚未采集${pending.join('、')}相关信息。`
     if (!report) report = '请在职能助手中提供更多个人信息以生成诊断报告。'
@@ -575,12 +594,24 @@ const initWordCloud = () => {
       overflow: hidden !important; /* 🌟 加上这一行，干掉内层滚动条 */
     }
 
-    .chart-container { 
-      width: 100%; 
-      height: 240px; 
+    .chart-container {
+      width: 100%;
+      height: 240px;
       flex: 1;
-      /* 3. 确保 ECharts 容器也不会因为微小溢出产生滚动 */
-      overflow: hidden; 
+      overflow: hidden;
+    }
+
+    .cloud-empty {
+      width: 100%;
+      height: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #94a3b8;
+      font-size: 14px;
+      .cloud-empty-icon { font-size: 28px; }
     }
   }
 }
