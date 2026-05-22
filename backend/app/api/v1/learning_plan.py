@@ -7,7 +7,34 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.agents.harness import harness
 from app.agents.learning_plan import tools
 from app.agents.llm_factory import get_llm
+from app.agents.job_matcher.db_utils import save_user_profile
 from app.middleware.auth import get_current_user
+
+
+DIM_ORDER = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
+
+
+def _build_save_profile(radar_data: list, dimension_details: dict, chat_history: list) -> dict:
+    """将画像分析结果构建为 job_matcher 可用的 user_profile 格式。"""
+    # 提取用户对话文本作为简历摘要
+    resume_text = "\n".join(
+        m.get("content", "") for m in chat_history if m.get("role") == "user"
+    )
+    # 从 dimension_details 提取各维度描述
+    dim_desc = {}
+    for i, dim in enumerate(DIM_ORDER):
+        detail = dimension_details.get(dim, {})
+        dim_desc[dim] = {
+            "score": radar_data[i] if i < len(radar_data) else 0,
+            "status": detail.get("status", "待补充"),
+            "desc": detail.get("desc", ""),
+        }
+    return {
+        "resume_text": resume_text,
+        "radar_data": radar_data,
+        "dimension_details": dim_desc,
+        "source": "chat_coach",
+    }
 
 router = APIRouter()
 
@@ -196,6 +223,14 @@ async def career_coach(req: CoachRequest, user: dict = Depends(get_current_user)
     except Exception:
         pass
 
+    # 持久化画像到 user_profiles 表，供 job_matcher 等智能体使用
+    if any(v > 0 for v in radar_data):
+        try:
+            profile_for_save = _build_save_profile(radar_data, dimension_details, full_history)
+            await save_user_profile(user["user_id"], profile_for_save)
+        except Exception:
+            pass
+
     return {
         "reply": reply,
         "radar_data": radar_data,
@@ -274,6 +309,14 @@ async def coach_stream(req: CoachRequest, user: dict = Depends(get_current_user)
             import traceback
             print(f"[Coach] Profile analyzer error: {e}")
             traceback.print_exc()
+
+        # 持久化画像到 user_profiles 表，供 job_matcher 等智能体使用
+        if any(v > 0 for v in radar_data):
+            try:
+                profile_for_save = _build_save_profile(radar_data, dimension_details, full_history)
+                await save_user_profile(user["user_id"], profile_for_save)
+            except Exception as e:
+                print(f"[Coach] Save profile failed: {e}")
 
         radar_payload = json.dumps({'type': 'radar', 'radar_data': radar_data, 'dimension_details': dimension_details}, ensure_ascii=False)
         print(f"[Coach] Sending radar event: {radar_payload[:200]}")

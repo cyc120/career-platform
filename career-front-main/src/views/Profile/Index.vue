@@ -9,9 +9,9 @@
         <el-icon><User /></el-icon>
         <span>个人信息</span>
       </el-menu-item>
-      <el-menu-item index="report">
-        <el-icon><DataAnalysis /></el-icon>
-        <span>AI 职业分析</span>
+      <el-menu-item index="match">
+        <el-icon><Connection /></el-icon>
+        <span>人岗匹配</span>
       </el-menu-item>
       <el-menu-item index="growth">
         <el-icon><TrendCharts /></el-icon>
@@ -174,8 +174,8 @@
           </div>
         </template>
 
-        <div v-else-if="activeTab === 'report'" class="sub-page">
-          <AIReport />
+        <div v-else-if="activeTab === 'match'" class="sub-page">
+          <JobMatch />
         </div>
         <div v-else-if="activeTab === 'growth'" class="sub-page">
           <GrowthTracker />
@@ -204,17 +204,17 @@ const _moduleState = {
 
 <script setup>
 import { ref, nextTick, computed, onMounted, onUnmounted } from 'vue'
-import { Upload } from '@element-plus/icons-vue'
+import { Upload, Connection } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { learningPlanApi } from '@/api/learningPlan'
 import * as mammoth from 'mammoth'
 
 // 导入你的子组件
 import PersonalInfo from './PersonalInfo.vue'
-import AIReport from './AIReport.vue'
 import GrowthTracker from './GrowthTracker.vue'
 import PolishAndExport from './PolishAndExport.vue'
 import FavoriteJobs from './FavoriteJobs.vue'
+import JobMatch from './JobMatch.vue'
 import RadarChart from '../../components/RadarChart.vue'
 import { currentRadarData, dimensionDetailsRaw, dimensionDetails } from './profileState.js'
 const attachedFile = ref(null) // 存储文件对象

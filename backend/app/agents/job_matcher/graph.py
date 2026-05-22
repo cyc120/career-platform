@@ -1,8 +1,8 @@
-"""Job Matcher Agent — RAG-enhanced job matching.
+"""Job Matcher Agent — RAG + LLM job profiling + algorithmic matching.
 
 LangGraph flow:
   load_user_profile -> retrieve_candidates (RAG) -> load_job_details
-  -> neo4j_enrich -> llm_match (parallel) -> rank_results -> save_report -> END
+  -> neo4j_enrich -> algorithmic_match (job_profiler + scorer) -> rank_results -> save_report -> END
 """
 from typing import Dict, Any
 
@@ -24,7 +24,11 @@ class JobMatcherAgent(AgentBase):
 
     @property
     def description(self) -> str:
-        return "基于RAG语义检索+7维LLM打分，从向量库和Neo4j知识图谱中匹配最适合的岗位"
+        return "基于RAG检索+LLM岗位画像+7维算法匹配，从向量库和Neo4j知识图谱中匹配最适合的岗位"
+
+    @property
+    def cacheable(self) -> bool:
+        return False
 
     def build_graph(self) -> StateGraph:
         builder = StateGraph(JobMatcherState)
@@ -33,7 +37,7 @@ class JobMatcherAgent(AgentBase):
         builder.add_node("retrieve_candidates", nodes.retrieve_candidates)
         builder.add_node("load_job_details", nodes.load_job_details)
         builder.add_node("neo4j_enrich", nodes.neo4j_enrich)
-        builder.add_node("llm_match", nodes.llm_match)
+        builder.add_node("algorithmic_match", nodes.algorithmic_match)
         builder.add_node("rank_results", nodes.rank_results)
         builder.add_node("save_report", nodes.save_report)
 
@@ -41,8 +45,8 @@ class JobMatcherAgent(AgentBase):
         builder.add_edge("load_user_profile", "retrieve_candidates")
         builder.add_edge("retrieve_candidates", "load_job_details")
         builder.add_edge("load_job_details", "neo4j_enrich")
-        builder.add_edge("neo4j_enrich", "llm_match")
-        builder.add_edge("llm_match", "rank_results")
+        builder.add_edge("neo4j_enrich", "algorithmic_match")
+        builder.add_edge("algorithmic_match", "rank_results")
         builder.add_edge("rank_results", "save_report")
         builder.add_edge("save_report", END)
 
@@ -54,6 +58,14 @@ class JobMatcherAgent(AgentBase):
             "user_id": input_data.get("user_id", 0),
             "user_profile": input_data.get("user_profile", {}),
         })
+
+        # If there's an error (no profile), return error message
+        if result.get("error"):
+            return {
+                "error": result["error"],
+                "matches": [],
+                "total_matches": 0,
+            }
 
         return {
             "matches": result.get("ranked_results", []),

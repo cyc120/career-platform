@@ -10,3 +10,4 @@ class JobMatcherState(TypedDict, total=False):
     match_results: list[dict]
     ranked_results: list[dict]
     report_id: int
+    error: str

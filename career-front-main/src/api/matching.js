@@ -1,7 +1,7 @@
 import api from './client'
 
 export const matchingApi = {
-  match() {
-    return api.post('/matching/match', {}, { timeout: 120000 })
+  match(profileData) {
+    return api.post('/matching/match', profileData || {}, { timeout: 120000 })
   },
 }

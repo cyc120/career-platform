@@ -1,24 +1,46 @@
 """LangGraph nodes for the Job Matcher agent."""
 
-import asyncio
 import json
 from typing import Dict
 
-from langchain_core.messages import HumanMessage, SystemMessage
-
-from app.agents.llm_factory import get_llm
 from app.agents.job_matcher.state import JobMatcherState
-from app.agents.job_matcher.prompts import WEIGHT_PROMPT, MATCH_PROMPT, MERGE_PROMPT
 from app.agents.job_matcher import db_utils
+from app.agents.job_matcher.scorer import MatchScorer
+from app.agents.harness import harness
 from app.rag.retrievers import resume_job_matcher
 from app.db.neo4j import neo4j_manager
 
 
 async def load_user_profile(state: JobMatcherState) -> Dict:
     uid = state["user_id"]
+
+    # If frontend sent profile data (from profileState.js), use it directly
+    input_profile = state.get("user_profile", {})
+    if input_profile and input_profile.get("source") == "frontend":
+        radar = input_profile.get("radar_data", [])
+        if radar and any(v > 0 for v in radar):
+            # Also save to DB for future use
+            try:
+                await db_utils.save_user_profile(uid, input_profile)
+            except Exception:
+                pass
+            return {"user_profile": input_profile}
+
+    # Otherwise read from database
     profile = await db_utils.get_user_profile(uid)
     if profile:
-        return {"user_profile": profile.get("profile_data", {})}
+        pd = profile.get("profile_data", {})
+        if isinstance(pd, str):
+            try:
+                pd = json.loads(pd)
+            except Exception:
+                pd = {}
+        # Check if profile has meaningful data (radar_data with non-zero values)
+        radar = pd.get("radar_data", [])
+        if radar and any(v > 0 for v in radar):
+            return {"user_profile": pd}
+        # Profile exists but has no meaningful scores
+        return {"user_profile": {}, "error": "用户画像数据为空，请先在「职能助手」中完成对话分析"}
 
     # If no user profile yet, check if there's one in the state
     if state.get("user_profile"):
@@ -26,7 +48,7 @@ async def load_user_profile(state: JobMatcherState) -> Dict:
         await db_utils.save_user_profile(uid, profile_data)
         return {"user_profile": profile_data}
 
-    return {"user_profile": {"error": "No user profile found. Please complete resume extraction first."}}
+    return {"user_profile": {}, "error": "未找到用户画像，请先在「职能助手」中完成对话分析"}
 
 
 async def retrieve_candidates(state: JobMatcherState) -> Dict:
@@ -78,62 +100,58 @@ async def neo4j_enrich(state: JobMatcherState) -> Dict:
     return {"neo4j_profiles": profiles}
 
 
-async def llm_match(state: JobMatcherState) -> Dict:
-    """LLM-based dimension matching for each job."""
+async def algorithmic_match(state: JobMatcherState) -> Dict:
+    """Match jobs using job_profiler (LLM) + algorithmic scoring."""
+    import asyncio
+
+    # Check if there's an error from load_user_profile (no valid profile)
+    if state.get("error"):
+        return {"match_results": []}
+
     profile = state.get("user_profile", {})
     jobs = state.get("job_details", [])
-    neo4j = state.get("neo4j_profiles", [])
 
     if not jobs:
         return {"match_results": []}
 
-    llm = get_llm(temperature=0.3)
-
-    async def match_one(job: dict, n4j: dict | None) -> dict:
-        profile_text = json.dumps(profile, ensure_ascii=False)
-        job_text = json.dumps(job, ensure_ascii=False)
-
-        # Determine weights
-        weight_msg = llm.invoke([
-            SystemMessage(content="输出纯JSON，不要加任何前缀说明。"),
-            HumanMessage(content=WEIGHT_PROMPT.format(job_info=job_text)),
-        ])
+    # Step 1: Get job requirements for each job via job_profiler agent
+    async def get_job_requirements(job: dict) -> dict:
         try:
-            weights = _parse_json(weight_msg.content)
-        except Exception:
-            weights = {}
+            result = await harness.run("job_profiler", {"job_info": job})
+            if result.get("success") and result.get("data"):
+                return result["data"].get("job_requirements", {})
+        except Exception as e:
+            print(f"[Match] job_profiler error: {e}")
+        return {}
 
-        # Match
-        match_msg = llm.invoke([
-            SystemMessage(content="输出纯JSON，不要加任何前缀说明。"),
-            HumanMessage(content=MATCH_PROMPT.format(
-                user_profile=profile_text,
-                job_requirement=job_text,
-                weights=json.dumps(weights, ensure_ascii=False),
-            )),
-        ])
+    # Run all job_profiler calls concurrently
+    req_tasks = [get_job_requirements(job) for job in jobs]
+    all_requirements = await asyncio.gather(*req_tasks)
+
+    # Step 2: Compute match scores using the scorer
+    scorer = MatchScorer()
+    results = []
+    for job, job_reqs in zip(jobs, all_requirements):
         try:
-            match_result = _parse_json(match_msg.content)
-        except Exception:
-            match_result = {"total_score": 0, "scores": {}, "summary": "匹配失败"}
-
-        return {
+            score_result = scorer.compute_scores(profile, job_reqs, job_info=job)
+        except Exception as e:
+            print(f"[Match] scorer error: {e}")
+            score_result = {
+                "total_score": 0, "scores": {},
+                "summary": "评分异常", "recommendations": [],
+            }
+        results.append({
             "job_id": job.get("id"),
             "job_title": job.get("job_title", ""),
             "company": job.get("company", ""),
             "industry": job.get("industry", ""),
             "city": job.get("city", ""),
             "salary_range": job.get("salary_range", ""),
-            **match_result,
-        }
+            **score_result,
+        })
 
-    tasks = []
-    for job in jobs:
-        n4j_match = next((n for n in neo4j if n.get("title") == job.get("job_title")), None)
-        tasks.append(match_one(job, n4j_match))
-
-    results = await asyncio.gather(*tasks)
-    return {"match_results": list(results)}
+    results.sort(key=lambda r: r.get("total_score", 0), reverse=True)
+    return {"match_results": results}
 
 
 async def rank_results(state: JobMatcherState) -> Dict:
@@ -157,12 +175,3 @@ async def save_report(state: JobMatcherState) -> Dict:
         )
 
     return {"report_id": 0}
-
-
-def _parse_json(content: str) -> dict:
-    c = content.strip()
-    for marker in ("```json", "```"):
-        if marker in c:
-            c = c.split(marker)[1].split("```")[0]
-            break
-    return json.loads(c)

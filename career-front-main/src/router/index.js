@@ -28,9 +28,9 @@ const routes = [
         component: () => import('@/views/Profile/PersonalInfo.vue')
       },
       {
-        path: 'report',
-        name: 'AIReport',
-        component: () => import('@/views/Profile/AIReport.vue')
+        path: 'match',
+        name: 'JobMatch',
+        component: () => import('@/views/Profile/JobMatch.vue')
       },
       {
         path: 'growth',

@@ -32,13 +32,15 @@ async def get_user_favorites(user_id: int) -> list[int]:
 async def get_job_details(job_ids: list[int]) -> list[dict]:
     if not job_ids:
         return []
+    placeholders = ", ".join(f":id{i}" for i in range(len(job_ids)))
+    params = {f"id{i}": int(vid) for i, vid in enumerate(job_ids)}
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             text(
-                "SELECT id, job_title, company, industry, city, salary_range, "
-                "job_description, requirements FROM jobs WHERE id IN :ids"
+                f"SELECT id, job_title, company, industry, city, salary_range, "
+                f"job_description, requirements FROM jobs WHERE id IN ({placeholders})"
             ),
-            {"ids": tuple(job_ids)},
+            params,
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
