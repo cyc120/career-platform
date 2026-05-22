@@ -1,5 +1,14 @@
 <template>
   <div class="personal-info-report">
+    <Transition name="status-fade">
+      <div v-if="reportStatus !== 'ready'" class="report-status-overlay">
+        <div class="status-card">
+          <div class="status-spinner"></div>
+          <p class="status-text">{{ reportStatus === 'loading' ? '你的报告正在生成，请稍等' : '你的报告正在优化，请稍后' }}</p>
+        </div>
+      </div>
+    </Transition>
+
     <el-row :gutter="20" class="row-first">
       <el-col :span="16">
         <el-card class="glass-card header-card">
@@ -35,16 +44,7 @@
       <el-col :span="8">
         <el-card class="glass-card detail-card">
           <template #header><div class="card-header">学习技能完整度</div></template>
-          <div class="progress-box">
-            <el-progress 
-              type="circle" 
-              :percentage="displayPercentage" 
-              :width="140"
-              :stroke-width="12"
-              color="#70a1ff" 
-            />
-            <p class="chart-tip" v-if="displayPercentage > 0">简历信息覆盖率 {{ displayPercentage }}%</p>
-          </div>
+          <div v-show="!loading" ref="completenessRef" class="chart-container"></div>
         </el-card>
       </el-col>
 
@@ -87,25 +87,37 @@
   </div>
 </template>
 
+<script>
+// 模块级缓存 — 组件销毁重建也不会丢失
+let _cachedHash = ''
+let _cachedResults = null
+</script>
+
 <script setup>
-import { ref, onMounted, onUnmounted, defineProps, defineEmits, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { School, Message, MagicStick } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
 import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
-import { careerPlanApi } from '@/api/careerPlan'
+import { diagnosisApi } from '@/api/diagnosis'
 
 const props = defineProps(['userInfo'])
 const emit = defineEmits(['re-edit'])
 
-const loading = ref(true)
+// 组件创建时检查缓存，决定初始状态
+const _hashNow = JSON.stringify(currentRadarData.value || []) + JSON.stringify(dimensionDetailsRaw.value || {})
+const _cacheHit = !!(_cachedResults && _cachedHash === _hashNow)
+
+const reportStatus = ref(_cacheHit ? 'ready' : 'loading')
+const loading = ref(!_cacheHit)
 const radarRef = ref(null)
 const wordCloudRef = ref(null)
+const completenessRef = ref(null)
 const competitivenessScore = ref(0)
 const aiSuggestions = ref('')
 
 let radarInstance = null
 let wordCloudInstance = null
+let completenessInstance = null
 
 const avatarUrl = 'https://ui-avatars.com/api/?name=User&background=ebf5ff&color=70a1ff'
 
@@ -115,9 +127,32 @@ const skillRadarData = ref([0, 0, 0, 0, 0, 0, 0])
 const wordCloudData = ref([])
 const displayPercentage = ref(0)
 
-const buildFromProfileData = async () => {
+const computeHash = () => {
+  const r = currentRadarData.value || []
+  const d = dimensionDetailsRaw.value || {}
+  return JSON.stringify(r) + JSON.stringify(d)
+}
+
+const applyCached = (cache) => {
+  analysisReport.value = cache.analysisReport
+  skillRadarData.value = [...cache.skillRadarData]
+  competitivenessScore.value = cache.competitivenessScore
+  wordCloudData.value = [...cache.wordCloudData]
+  displayPercentage.value = cache.displayPercentage
+}
+
+const buildFromProfileData = async (forceApi = false) => {
   const radar = currentRadarData.value
   const details = dimensionDetailsRaw.value
+  const hash = computeHash()
+
+  // 缓存命中且非强制刷新 → 直接复用
+  if (!forceApi && _cachedResults && _cachedHash === hash) {
+    applyCached(_cachedResults)
+    loading.value = false
+    reportStatus.value = 'ready'
+    return
+  }
 
   // 雷达图数据直接来自画像分析
   if (radar && radar.some(v => v > 0)) {
@@ -139,52 +174,57 @@ const buildFromProfileData = async () => {
     displayPercentage.value = Math.round((analyzed / 7) * 100)
   }
 
-  // 词云数据
-  wordCloudData.value = DIM_NAMES.map((dim, i) => ({
-    name: dim,
-    value: details?.[dim]?.score || radar?.[i] || 0,
-  })).filter(d => d.value > 0)
+  // 词云数据 — 从已分析维度中提取核心技能描述
+  wordCloudData.value = DIM_NAMES.map((dim, i) => {
+    const d = details?.[dim]
+    const score = d?.score || radar?.[i] || 0
+    if (!d || d.status !== '已分析' || score === 0) return null
+    const desc = d.desc || ''
+    if (!desc || desc === '暂无信息' || desc === '暂无相关信息' || desc === '根据关联维度推断') return null
+    const keywords = desc.split(/[,，、\s]+/).filter(k => k.length >= 2 && k.length <= 8)
+    return keywords.map(k => ({ name: k, value: score }))
+  }).filter(Boolean).flat()
 
-  // AI 诊断报告 — 调用 career_planner 智能体，综合画像分析输出
+  // AI 诊断报告 — 调用 diagnosis 智能体，生成300-400字深度分析
   try {
-    const { data: wrapper } = await careerPlanApi.generate()
-    const plan = wrapper?.data || wrapper
-    const topJob = plan?.top_job || {}
-    const trends = plan?.trends || {}
-    const careerPath = plan?.career_path || {}
-
+    const { data: res } = await diagnosisApi.generate({
+      radar_data: skillRadarData.value,
+      dimension_details: details || {},
+    })
+    analysisReport.value = res?.report || res?.data?.report || ''
+    if (!analysisReport.value) throw new Error('Empty report')
+  } catch (e) {
+    console.warn('[Diagnosis] API failed, using fallback:', e?.message)
+    const analyzed = DIM_NAMES.filter(d => details?.[d]?.status === '已分析')
     const strong = DIM_NAMES.filter(d => (details?.[d]?.score || 0) >= 60)
     const weak = DIM_NAMES.filter(d => { const s = details?.[d]?.score || 0; return s > 0 && s < 40 })
     const pending = DIM_NAMES.filter(d => !details?.[d] || details[d].score === 0)
-
     let report = ''
-    // 画像分析摘要
-    if (strong.length) report += `优势维度：${strong.join('、')}。`
-    if (weak.length) report += `待提升：${weak.join('、')}。`
-    if (pending.length) report += `未采集：${pending.join('、')}。`
-    // 职业规划信息
-    if (topJob.job_name) report += `\n目标岗位：${topJob.job_name}`
-    if (topJob.match_score) report += `，匹配度${Math.round(topJob.match_score * 100)}分。`
-    if (trends.salary_forecast?.length) {
-      const latest = trends.salary_forecast[trends.salary_forecast.length - 1]
-      report += `\n薪资预测：${latest.year}年预计月薪${latest.value}k。`
+    if (analyzed.length) {
+      report += '根据画像分析，'
+      if (strong.length) report += `你在${strong.join('、')}方面表现突出。`
+      if (weak.length) report += `${weak.join('、')}方面仍有提升空间。`
+      analyzed.forEach(d => {
+        const desc = details[d].desc
+        if (desc && desc !== '暂无信息' && desc !== '暂无相关信息' && desc !== '根据关联维度推断') {
+          report += `${d}方面${desc}。`
+        }
+      })
     }
-    if (careerPath?.suggestion) report += `\n职业建议：${careerPath.suggestion}`
-    if (!report) report = '请在职能助手中提供更多个人信息以生成诊断报告。'
-    analysisReport.value = report
-  } catch {
-    // career_planner 调用失败时，用画像数据生成基础报告
-    const strong = DIM_NAMES.filter(d => (details?.[d]?.score || 0) >= 60)
-    const weak = DIM_NAMES.filter(d => { const s = details?.[d]?.score || 0; return s > 0 && s < 40 })
-    const pending = DIM_NAMES.filter(d => !details?.[d] || details[d].score === 0)
-    let report = ''
-    if (strong.length) report += `优势维度：${strong.join('、')}。`
-    if (weak.length) report += `待提升：${weak.join('、')}。`
-    if (pending.length) report += `未采集：${pending.join('、')}。`
+    if (pending.length) report += `尚未采集${pending.join('、')}相关信息。`
     if (!report) report = '请在职能助手中提供更多个人信息以生成诊断报告。'
     analysisReport.value = report
   }
 
+  // 写入缓存
+  _cachedHash = hash
+  _cachedResults = {
+    analysisReport: analysisReport.value,
+    skillRadarData: [...skillRadarData.value],
+    competitivenessScore: competitivenessScore.value,
+    wordCloudData: [...wordCloudData.value],
+    displayPercentage: displayPercentage.value,
+  }
   loading.value = false
 }
 
@@ -192,16 +232,56 @@ const buildFromProfileData = async () => {
 const handleResize = () => {
   radarInstance?.resize()
   wordCloudInstance?.resize()
+  completenessInstance?.resize()
 }
 
+// 监听画像数据变化 — 仅当数据真正改变时才重新分析
+watch([currentRadarData, dimensionDetailsRaw], async () => {
+  const hash = computeHash()
+  if (hash === _cachedHash) return // 数据未变，跳过
+  if (reportStatus.value === 'ready') {
+    reportStatus.value = 'updating'
+    await buildFromProfileData(true)
+    await nextTick()
+    initRadarChart()
+    initCompletenessChart()
+    initWordCloud()
+    setTimeout(() => { reportStatus.value = 'ready' }, 1500)
+  }
+}, { deep: true })
+
 onMounted(async () => {
+  window.addEventListener('resize', handleResize)
+
+  // 缓存命中 → 直接渲染，不显示加载动画
+  if (_cachedResults && _cachedHash === computeHash()) {
+    applyCached(_cachedResults)
+    loading.value = false
+    reportStatus.value = 'ready'
+    await nextTick()
+    initRadarChart()
+    initCompletenessChart()
+    initWordCloud()
+    return
+  }
+
+  // 首次加载 → 展示加载动画
+  const startTime = Date.now()
+  const MIN_DISPLAY = 2000
+
   await buildFromProfileData()
   await nextTick()
   setTimeout(() => {
     initRadarChart()
+    initCompletenessChart()
     initWordCloud()
-    window.addEventListener('resize', handleResize)
   }, 150)
+
+  const elapsed = Date.now() - startTime
+  if (elapsed < MIN_DISPLAY) {
+    await new Promise(r => setTimeout(r, MIN_DISPLAY - elapsed))
+  }
+  reportStatus.value = 'ready'
 })
 
 // 🌟 4. 这里的销毁和注销很重要
@@ -209,6 +289,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   radarInstance?.dispose()
   wordCloudInstance?.dispose()
+  completenessInstance?.dispose()
 })
 
 const initRadarChart = () => {
@@ -246,39 +327,148 @@ const initRadarChart = () => {
   })
 }
 
+const initCompletenessChart = () => {
+  if (!completenessRef.value) return
+  if (completenessInstance) completenessInstance.dispose()
+
+  completenessInstance = echarts.init(completenessRef.value)
+  const scores = skillRadarData.value
+
+  completenessInstance.setOption({
+    grid: { left: 80, right: 30, top: 10, bottom: 10 },
+    xAxis: {
+      type: 'value',
+      max: 100,
+      axisLabel: { show: false },
+      axisLine: { show: false },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'category',
+      data: DIM_NAMES,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#475569', fontSize: 12, fontWeight: 'bold' },
+    },
+    series: [{
+      type: 'bar',
+      data: scores.map((v) => ({
+        value: v,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#70a1ff' },
+            { offset: 1, color: '#a5b4fc' },
+          ]),
+          borderRadius: [0, 6, 6, 0],
+        },
+      })),
+      barWidth: 18,
+      label: {
+        show: true,
+        position: 'right',
+        formatter: '{c}分',
+        color: '#475569',
+        fontSize: 12,
+      },
+    }],
+  })
+}
+
 const initWordCloud = () => {
   if (!wordCloudRef.value) return
   if (wordCloudInstance) wordCloudInstance.dispose()
 
   wordCloudInstance = echarts.init(wordCloudRef.value)
-  const colorPalette = ['#7dd3fc', '#a5b4fc', '#99f6e4', '#fef08a']
   const data = wordCloudData.value
+  if (!data.length) return
+
+  const colorPalette = [
+    'rgba(112, 161, 255, 0.85)', 'rgba(165, 180, 252, 0.85)',
+    'rgba(153, 246, 228, 0.85)', 'rgba(254, 240, 138, 0.85)',
+    'rgba(125, 211, 252, 0.85)', 'rgba(196, 181, 253, 0.85)',
+  ]
 
   wordCloudInstance.setOption({
     series: [{
-      type: 'graph', 
+      type: 'graph',
       layout: 'force',
-      roam: true, 
-      draggable: true, 
-      force: { repulsion: 60, edgeLength: 40 },
-      data: data.map((i, index) => ({ 
-        name: i.name, 
-        symbolSize: i.value, 
-        itemStyle: { 
+      roam: false,
+      draggable: true,
+      force: { repulsion: 120, edgeLength: 30, gravity: 0.1 },
+      data: data.map((item, index) => ({
+        name: item.name,
+        symbolSize: Math.max(item.name.length * 14 + 20, 30),
+        itemStyle: {
           color: colorPalette[index % colorPalette.length],
-          shadowBlur: 10,
-          shadowColor: 'rgba(112, 161, 255, 0.2)' 
-        } 
+          shadowBlur: 15,
+          shadowColor: 'rgba(112, 161, 255, 0.3)',
+          borderColor: 'rgba(255,255,255,0.6)',
+          borderWidth: 2,
+        },
       })),
-      label: { show: true, fontSize: 12, color: '#475569', fontWeight: 'bold' }
-    }]
+      label: {
+        show: true,
+        fontSize: 11,
+        color: '#1e293b',
+        fontWeight: 'bold',
+        formatter: '{b}',
+      },
+    }],
   })
 }
 </script>
 
 <style scoped lang="scss">
+.report-status-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(246, 248, 255, 0.85);
+  backdrop-filter: blur(12px);
+
+  .status-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 48px 64px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 24px;
+    border: 1px solid rgba(112, 161, 255, 0.15);
+    box-shadow: 0 16px 48px rgba(112, 161, 255, 0.08);
+  }
+
+  .status-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(112, 161, 255, 0.15);
+    border-top-color: #70a1ff;
+    border-radius: 50%;
+    animation: statusSpin 0.8s linear infinite;
+  }
+
+  .status-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #3c4e68;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+}
+
+@keyframes statusSpin { to { transform: rotate(360deg); } }
+
+.status-fade-enter-active,
+.status-fade-leave-active { transition: opacity 0.4s ease; }
+.status-fade-enter-from,
+.status-fade-leave-to { opacity: 0; }
+
 .personal-info-report {
   display: flex; flex-direction: column; gap: 20px; padding: 10px;
+  position: relative;
 }
 
 .glass-card {

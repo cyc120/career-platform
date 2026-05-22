@@ -236,7 +236,7 @@ const extractFileText = async (file) => {
     const base64 = btoa(binary)
 
     const token = localStorage.getItem('access_token')
-    const resp = await fetch('http://localhost:8002/api/v1/learning-plan/parse-file', {
+    const resp = await fetch('http://localhost:8000/api/v1/learning-plan/parse-file', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

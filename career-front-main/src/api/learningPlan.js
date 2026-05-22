@@ -43,7 +43,7 @@ export const learningPlanApi = {
     console.log('[coachStream] Starting stream request...')
     const token = await ensureToken()
     // 直连后端，绕过 Vite proxy（proxy 会缓冲 SSE）
-    const resp = await fetch('http://localhost:8002/api/v1/learning-plan/coach/stream', {
+    const resp = await fetch('http://localhost:8000/api/v1/learning-plan/coach/stream', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
