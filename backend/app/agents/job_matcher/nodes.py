@@ -6,7 +6,7 @@ from typing import Dict
 from app.agents.job_matcher.state import JobMatcherState
 from app.agents.job_matcher import db_utils
 from app.agents.job_matcher.scorer import MatchScorer
-from app.agents.harness import harness
+from app.agents.job_matcher.job_profiler import extract_job_requirements
 from app.rag.retrievers import resume_job_matcher
 from app.db.neo4j import neo4j_manager
 
@@ -114,12 +114,10 @@ async def algorithmic_match(state: JobMatcherState) -> Dict:
     if not jobs:
         return {"match_results": []}
 
-    # Step 1: Get job requirements for each job via job_profiler agent
+    # Step 1: Get job requirements for each job (sub-agent: job_profiler)
     async def get_job_requirements(job: dict) -> dict:
         try:
-            result = await harness.run("job_profiler", {"job_info": job})
-            if result.get("success") and result.get("data"):
-                return result["data"].get("job_requirements", {})
+            return await extract_job_requirements(job)
         except Exception as e:
             print(f"[Match] job_profiler error: {e}")
         return {}

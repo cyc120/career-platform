@@ -6,6 +6,7 @@ from typing import Optional, List
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.agents.harness import harness
 from app.agents.learning_plan import tools
+from app.agents.learning_plan.profile_analyzer import analyze_profile
 from app.agents.llm_factory import get_llm
 from app.agents.job_matcher.db_utils import save_user_profile
 from app.middleware.auth import get_current_user
@@ -204,22 +205,17 @@ async def career_coach(req: CoachRequest, user: dict = Depends(get_current_user)
         {"role": "assistant", "content": reply},
     ]
 
-    # Run profile analyzer agent via harness
+    # Run profile analyzer (sub-module)
     radar_data = [0, 0, 0, 0, 0, 0, 0]
     dimension_details = {}
     try:
-        result = await harness.run(
-            "profile_analyzer",
-            {
-                "chat_history": full_history,
-                "previous_radar_data": req.previous_radar_data,
-                "previous_details": req.previous_details or {},
-            },
-            user_id=user["user_id"],
+        result = await analyze_profile(
+            chat_history=full_history,
+            previous_radar_data=req.previous_radar_data,
+            previous_details=req.previous_details or {},
         )
-        if result.get("success") and result.get("data"):
-            radar_data = result["data"].get("radar_data", radar_data)
-            dimension_details = result["data"].get("dimension_details", dimension_details)
+        radar_data = result.get("radar_data", radar_data)
+        dimension_details = result.get("dimension_details", dimension_details)
     except Exception:
         pass
 
@@ -285,7 +281,7 @@ async def coach_stream(req: CoachRequest, user: dict = Depends(get_current_user)
                 full_reply += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
 
-        # Run profile analyzer after stream completes
+        # Run profile analyzer (sub-module) after stream completes
         full_history = list(req.history) + [
             {"role": "user", "content": req.message},
             {"role": "assistant", "content": full_reply},
@@ -293,18 +289,13 @@ async def coach_stream(req: CoachRequest, user: dict = Depends(get_current_user)
         radar_data = [0, 0, 0, 0, 0, 0, 0]
         dimension_details = {}
         try:
-            result = await harness.run(
-                "profile_analyzer",
-                {
-                    "chat_history": full_history,
-                    "previous_radar_data": req.previous_radar_data,
-                    "previous_details": req.previous_details or {},
-                },
-                user_id=user["user_id"],
+            result = await analyze_profile(
+                chat_history=full_history,
+                previous_radar_data=req.previous_radar_data,
+                previous_details=req.previous_details or {},
             )
-            if result.get("success") and result.get("data"):
-                radar_data = result["data"].get("radar_data", radar_data)
-                dimension_details = result["data"].get("dimension_details", dimension_details)
+            radar_data = result.get("radar_data", radar_data)
+            dimension_details = result.get("dimension_details", dimension_details)
         except Exception as e:
             import traceback
             print(f"[Coach] Profile analyzer error: {e}")
