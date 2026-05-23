@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from app.config import settings
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=16)
 def get_llm(temperature: float = 0.1, max_tokens: int = 4096) -> ChatOpenAI:
     return ChatOpenAI(
         model=settings.OPENAI_MODEL,

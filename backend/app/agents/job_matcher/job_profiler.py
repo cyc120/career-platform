@@ -4,15 +4,13 @@ This is a sub-module of job_matcher, not an independent agent.
 Includes in-memory cache and retry logic to replace the lost harness features.
 """
 
-import asyncio
 import hashlib
 import json
-from functools import lru_cache
 from typing import Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agents.llm_factory import get_llm
+from app.agents.retry import llm_call_with_retry
 
 DIMENSIONS = ["专业技能", "证书资质", "创新能力", "学习能力", "抗压能力", "沟通能力", "实习/项目经验"]
 
@@ -99,7 +97,7 @@ async def extract_job_requirements(job: dict, max_retries: int = 2) -> dict:
 
     Features:
     - In-memory cache: same job_id won't call LLM twice
-    - Retry with exponential backoff
+    - Retry with exponential backoff via common retry utility
     - Timeout protection (30s per attempt)
     """
     # Check cache first
@@ -112,8 +110,6 @@ async def extract_job_requirements(job: dict, max_retries: int = 2) -> dict:
     job_desc = job.get("job_description", "")
     requirements = job.get("requirements", "")
 
-    llm = get_llm(temperature=0.2, max_tokens=800)
-
     prompt = EXTRACT_REQUIREMENTS_PROMPT.format(
         job_title=job_title,
         company=company,
@@ -121,38 +117,28 @@ async def extract_job_requirements(job: dict, max_retries: int = 2) -> dict:
         requirements=requirements or "暂无",
     )
 
-    # Retry logic with exponential backoff
-    last_error = None
-    for attempt in range(max_retries + 1):
-        try:
-            response = await asyncio.wait_for(
-                llm.ainvoke([
-                    SystemMessage(content="输出纯JSON，不要加任何前缀说明或markdown标记。"),
-                    HumanMessage(content=prompt),
-                ]),
-                timeout=30,
-            )
-            result = _parse_json(response.content)
-            normalized = _normalize_result(result)
+    try:
+        content = await llm_call_with_retry(
+            messages=[
+                SystemMessage(content="输出纯JSON，不要加任何前缀说明或markdown标记。"),
+                HumanMessage(content=prompt),
+            ],
+            temperature=0.2,
+            max_tokens=800,
+            max_retries=max_retries,
+            timeout=30,
+        )
+        result = _parse_json(content)
+        normalized = _normalize_result(result)
 
-            # Cache the result
-            if len(_requirements_cache) >= MAX_CACHE_SIZE:
-                # Remove oldest entry (simple FIFO)
-                oldest_key = next(iter(_requirements_cache))
-                del _requirements_cache[oldest_key]
-            _requirements_cache[cache_key] = normalized
+        # Cache the result
+        if len(_requirements_cache) >= MAX_CACHE_SIZE:
+            oldest_key = next(iter(_requirements_cache))
+            del _requirements_cache[oldest_key]
+        _requirements_cache[cache_key] = normalized
 
-            return normalized
+        return normalized
 
-        except asyncio.TimeoutError:
-            last_error = "LLM timeout"
-        except Exception as e:
-            last_error = str(e)
-
-        # Exponential backoff: 1s, 2s
-        if attempt < max_retries:
-            await asyncio.sleep(2 ** attempt)
-
-    # All retries failed, return default
-    print(f"[JobProfiler] Failed after {max_retries + 1} attempts: {last_error}")
-    return _normalize_result({})
+    except Exception as e:
+        print(f"[JobProfiler] Failed after retries: {e}")
+        return _normalize_result({})

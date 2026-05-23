@@ -20,11 +20,20 @@ class SelectJobRequest(BaseModel):
     job_data: Dict
 
 
+def _task_done_callback(task: asyncio.Task, label: str):
+    """Log errors from fire-and-forget background tasks."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc:
+        print(f"[Matching] background task '{label}' failed: {exc}")
+
+
 async def push_to_planners(user_id: int, top_job: dict):
     """异步推送匹配结果给 career_planner 和 learning_plan"""
     try:
         job_name = top_job.get("job_title", "") or top_job.get("job_name", "")
-        await asyncio.gather(
+        results = await asyncio.gather(
             harness.run(
                 "career_planner",
                 {"user_id": user_id, "top_job": top_job},
@@ -37,6 +46,11 @@ async def push_to_planners(user_id: int, top_job: dict):
             ),
             return_exceptions=True,
         )
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                print(f"[Matching] push_to_planners subtask {i} error: {r}")
+            elif isinstance(r, dict) and not r.get("success"):
+                print(f"[Matching] push_to_planners subtask {i} failed: {r.get('error')}")
     except Exception as e:
         print(f"[Matching] push_to_planners error: {e}")
 
@@ -44,11 +58,13 @@ async def push_to_planners(user_id: int, top_job: dict):
 async def push_career_planner(user_id: int, top_job: dict):
     """异步推送匹配结果给 career_planner（learning_plan 已在 select-job 中同步完成）"""
     try:
-        await harness.run(
+        result = await harness.run(
             "career_planner",
             {"user_id": user_id, "top_job": top_job},
             user_id=user_id,
         )
+        if isinstance(result, dict) and not result.get("success"):
+            print(f"[Matching] push_career_planner failed: {result.get('error')}")
     except Exception as e:
         print(f"[Matching] push_career_planner error: {e}")
 
@@ -77,7 +93,8 @@ async def match_jobs(req: MatchRequest = None, user: dict = Depends(get_current_
         if matches:
             top_job = matches[0]
             # 不等待完成，立即返回匹配结果给前端
-            asyncio.create_task(push_to_planners(user["user_id"], top_job))
+            task = asyncio.create_task(push_to_planners(user["user_id"], top_job))
+            task.add_done_callback(lambda t: _task_done_callback(t, "push_to_planners"))
 
     return result
 
@@ -91,7 +108,8 @@ async def select_job(req: SelectJobRequest, user: dict = Depends(get_current_use
     print(f"[Matching] select-job: saved '{job_name}' for user {uid}, old tasks cleared")
 
     # career_planner 异步执行
-    asyncio.create_task(push_career_planner(uid, req.job_data))
+    task = asyncio.create_task(push_career_planner(uid, req.job_data))
+    task.add_done_callback(lambda t: _task_done_callback(t, "push_career_planner"))
 
     return {"success": True, "message": "岗位已锁定"}
 

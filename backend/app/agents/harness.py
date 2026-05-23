@@ -93,7 +93,7 @@ class AgentHarness:
             except Exception:
                 pass  # Redis unavailable — skip cache
 
-        # Execute with retry
+        # Execute with retry + exponential backoff
         last_error = None
         for attempt in range(agent.max_retries + 1):
             started_at = time.monotonic()
@@ -127,6 +127,10 @@ class AgentHarness:
                 last_error = f"Timeout after {agent.timeout_seconds}s"
             except Exception as e:
                 last_error = str(e)
+
+            # Exponential backoff: 1s, 2s, 4s
+            if attempt < agent.max_retries:
+                await asyncio.sleep(min(2 ** attempt, 8))
 
         return {
             "success": False,

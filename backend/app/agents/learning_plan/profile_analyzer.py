@@ -4,12 +4,11 @@ This is a sub-module used by the learning_plan API, not an independent agent.
 Includes retry logic and timeout protection.
 """
 
-import asyncio
 import json
 from typing import Dict, Any
 
 from langchain_core.messages import SystemMessage, HumanMessage
-from app.agents.llm_factory import get_llm
+from app.agents.retry import llm_call_with_retry
 
 # RadarChart维度顺序
 DIMENSION_ORDER = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
@@ -354,26 +353,14 @@ def _parse_json(content: str) -> dict:
 
 
 async def _llm_with_retry(messages: list, temperature: float = 0, max_tokens: int = 1000, max_retries: int = 2, timeout: int = 30) -> str:
-    """Call LLM with retry and timeout protection."""
-    llm = get_llm(temperature=temperature, max_tokens=max_tokens)
-    last_error = None
-
-    for attempt in range(max_retries + 1):
-        try:
-            response = await asyncio.wait_for(
-                llm.ainvoke(messages),
-                timeout=timeout,
-            )
-            return response.content
-        except asyncio.TimeoutError:
-            last_error = "LLM timeout"
-        except Exception as e:
-            last_error = str(e)
-
-        if attempt < max_retries:
-            await asyncio.sleep(2 ** attempt)
-
-    raise Exception(f"LLM call failed after {max_retries + 1} attempts: {last_error}")
+    """Call LLM with retry and timeout protection (delegates to common utility)."""
+    return await llm_call_with_retry(
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        max_retries=max_retries,
+        timeout=timeout,
+    )
 
 
 async def analyze_profile(

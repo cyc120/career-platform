@@ -1,13 +1,19 @@
 <template>
   <div class="personal-info-report">
-    <Transition name="status-fade">
-      <div v-if="reportStatus !== 'ready'" class="report-status-overlay">
-        <div class="status-card">
-          <div class="status-spinner"></div>
-          <p class="status-text">{{ reportStatus === 'loading' ? '你的报告正在生成，请稍等' : '你的报告正在优化，请稍后' }}</p>
-        </div>
+    <transition name="loading-fade">
+      <div v-if="reportStatus !== 'ready'" class="custom-loading-overlay">
+        <InteractiveLoading
+          title="AI 深度诊断中"
+          description="正在融合画像数据与诊断模型，生成个性化分析报告"
+          statusText="Career Pilot 诊断引擎运行中"
+          :steps="loadingSteps"
+          :currentStep="currentLoadingStep"
+          :progress="loadingProgress"
+          :showProgress="true"
+          :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书']"
+        />
       </div>
-    </Transition>
+    </transition>
 
     <el-row :gutter="20" class="row-first">
       <el-col :span="16">
@@ -103,6 +109,7 @@ import { School, Message, MagicStick } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
 import { diagnosisApi } from '@/api/diagnosis'
+import InteractiveLoading from '@/components/InteractiveLoading.vue'
 
 const props = defineProps(['userInfo'])
 const emit = defineEmits(['re-edit'])
@@ -118,6 +125,39 @@ const wordCloudRef = ref(null)
 const completenessRef = ref(null)
 const competitivenessScore = ref(0)
 const aiSuggestions = ref('')
+
+// InteractiveLoading 动画状态
+const loadingSteps = ['加载画像数据', '计算能力模型', '生成词云分析', 'AI 深度诊断']
+const currentLoadingStep = ref(0)
+const loadingProgress = ref(0)
+let loadingTimer = null
+let progressTimer = null
+
+const startLoadingAnimation = () => {
+  currentLoadingStep.value = 0
+  loadingProgress.value = 0
+  const stepTexts = ['正在加载画像数据...', '正在计算能力模型...', '正在生成词云分析...', '正在调用 AI 诊断...']
+  loadingTimer = setInterval(() => {
+    if (currentLoadingStep.value < loadingSteps.length - 1) {
+      currentLoadingStep.value++
+    }
+  }, 1200)
+  progressTimer = setInterval(() => {
+    if (loadingProgress.value < 90) {
+      loadingProgress.value += Math.random() * 12
+    }
+  }, 400)
+}
+
+const stopLoadingAnimation = () => {
+  loadingProgress.value = 100
+  currentLoadingStep.value = loadingSteps.length
+  clearInterval(loadingTimer)
+  clearInterval(progressTimer)
+  setTimeout(() => {
+    reportStatus.value = 'ready'
+  }, 300)
+}
 
 // 综合评定等级
 const scoreLevel = computed(() => {
@@ -308,8 +348,7 @@ onMounted(async () => {
   }
 
   // 首次加载 → 展示加载动画
-  const startTime = Date.now()
-  const MIN_DISPLAY = 2000
+  startLoadingAnimation()
 
   await buildFromProfileData()
   await nextTick()
@@ -319,11 +358,7 @@ onMounted(async () => {
     initWordCloud()
   }, 150)
 
-  const elapsed = Date.now() - startTime
-  if (elapsed < MIN_DISPLAY) {
-    await new Promise(r => setTimeout(r, MIN_DISPLAY - elapsed))
-  }
-  reportStatus.value = 'ready'
+  stopLoadingAnimation()
 })
 
 // 🌟 4. 这里的销毁和注销很重要
@@ -332,6 +367,8 @@ onUnmounted(() => {
   radarInstance?.dispose()
   wordCloudInstance?.dispose()
   completenessInstance?.dispose()
+  clearInterval(loadingTimer)
+  clearInterval(progressTimer)
 })
 
 const initRadarChart = () => {
@@ -461,7 +498,7 @@ const initWordCloud = () => {
 </script>
 
 <style scoped lang="scss">
-.report-status-overlay {
+.custom-loading-overlay {
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
@@ -471,42 +508,13 @@ const initWordCloud = () => {
   justify-content: center;
   background: rgba(246, 248, 255, 0.85);
   backdrop-filter: blur(12px);
-
-  .status-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    padding: 48px 64px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 24px;
-    border: 1px solid rgba(112, 161, 255, 0.15);
-    box-shadow: 0 16px 48px rgba(112, 161, 255, 0.08);
-  }
-
-  .status-spinner {
-    width: 40px; height: 40px;
-    border: 3px solid rgba(112, 161, 255, 0.15);
-    border-top-color: #70a1ff;
-    border-radius: 50%;
-    animation: statusSpin 0.8s linear infinite;
-  }
-
-  .status-text {
-    font-size: 16px;
-    font-weight: 600;
-    color: #3c4e68;
-    letter-spacing: 0.5px;
-    margin: 0;
-  }
+  border-radius: 20px;
 }
 
-@keyframes statusSpin { to { transform: rotate(360deg); } }
-
-.status-fade-enter-active,
-.status-fade-leave-active { transition: opacity 0.4s ease; }
-.status-fade-enter-from,
-.status-fade-leave-to { opacity: 0; }
+.loading-fade-enter-active,
+.loading-fade-leave-active { transition: opacity 0.5s ease; }
+.loading-fade-enter-from,
+.loading-fade-leave-to { opacity: 0; }
 
 .personal-info-report {
   display: flex; flex-direction: column; gap: 20px; padding: 10px;

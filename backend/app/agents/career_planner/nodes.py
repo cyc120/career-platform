@@ -38,7 +38,7 @@ async def predict_trends(state: CareerPlannerState) -> Dict:
     skills = ", ".join(profile.get("技能清单", {}).get("content", "").split("\n")[:5]) if profile else ""
 
     llm = get_llm(temperature=0.7)
-    msg = llm.invoke([
+    msg = await llm.ainvoke([
         SystemMessage(content=TREND_SYSTEM_PROMPT + "\n输出纯JSON。"),
         HumanMessage(content=TREND_USER_PROMPT.format(job_name=job_name, skills=skills or "未提供")),
     ])
@@ -63,7 +63,7 @@ async def generate_career_path(state: CareerPlannerState) -> Dict:
     promo = state.get("promotion_data", [])
 
     llm = get_llm(temperature=0.7)
-    msg = llm.invoke([
+    msg = await llm.ainvoke([
         SystemMessage(content=PATH_SYSTEM_PROMPT + "\n输出纯JSON。"),
         HumanMessage(content=PATH_USER_PROMPT.format(
             user_profile=json.dumps(profile, ensure_ascii=False),
