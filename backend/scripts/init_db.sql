@@ -146,6 +146,16 @@ CREATE TABLE IF NOT EXISTS agent_runs (
 CREATE INDEX IF NOT EXISTS idx_agent_runs_agent_user ON agent_runs(agent_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
 
+CREATE TABLE IF NOT EXISTS user_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    report_text TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_reports_user ON user_reports(user_id);
+
 -- Seed data: test user (password = "password123", bcrypt hash)
 INSERT OR IGNORE INTO users (username, email, password_hash) VALUES
 ('testuser', 'test@example.com', '$2b$12$LJ3m4ys3uz0Gv0gMOsYmNe8JI8k/.dRgRv0cOx5vGJy0fkKzJKHpy');

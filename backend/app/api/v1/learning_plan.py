@@ -7,6 +7,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.agents.harness import harness
 from app.agents.learning_plan import tools
 from app.agents.learning_plan.profile_analyzer import analyze_profile
+from app.agents.learning_plan.task_planner import generate_daily_tasks as planner_generate
 from app.agents.llm_factory import get_llm
 from app.agents.job_matcher.db_utils import save_user_profile
 from app.middleware.auth import get_current_user
@@ -182,7 +183,7 @@ async def polish_plan(req: PolishRequest, user: dict = Depends(get_current_user)
 
 @router.post("/daily-tasks")
 async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_current_user)):
-    from app.agents.job_matcher.db_utils import get_selected_job
+    from app.agents.job_matcher.db_utils import get_selected_job, get_user_profile
     from app.agents.learning_plan import prompts as lp_prompts
     import json as _json
 
@@ -190,6 +191,10 @@ async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_
     selected = await get_selected_job(uid)
     target_job = selected.get("job_title", "") if selected else ""
     print(f"[API] daily-tasks user_id={uid}, target_job='{target_job}', selected={selected is not None}")
+
+    # 没有锁定岗位时直接返回空，避免用空 target_job 生成无效任务
+    if not target_job:
+        return {"success": False, "daily_tasks": [], "target_job": "", "error": "请先在人岗匹配中锁定一个岗位"}
 
     # 1. 检查已有任务是否匹配当前锁定岗位
     existing_tasks = await tools.get_daily_tasks(uid)
@@ -247,53 +252,24 @@ async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_
     if not phases:
         return {"success": False, "daily_tasks": [], "target_job": target_job, "error": "学习计划阶段为空"}
 
-    # 5. 取第一个阶段，直接调 LLM 生成任务
-    phase = phases[req.phase_index] if req.phase_index < len(phases) else phases[0]
-    phase_str = _json.dumps(phase, ensure_ascii=False)
-
-    tasks = []
-    llm = get_llm(temperature=0.4)
-    for attempt in range(2):
+    # 5. 加载用户画像，融合到任务生成
+    profile_record = await get_user_profile(uid)
+    user_profile = profile_record.get("profile_data") if profile_record else None
+    if isinstance(user_profile, str):
         try:
-            msg = await llm.ainvoke([
-                SystemMessage(content=lp_prompts.DAILY_TASK_SYSTEM),
-                HumanMessage(content=lp_prompts.DAILY_TASK_USER.format(
-                    target_job=target_job, phase=phase_str,
-                )),
-            ])
-            raw = msg.content.strip()
-            # 提取 JSON
-            for marker in ("```json", "```"):
-                if marker in raw:
-                    raw = raw.split(marker)[1].split("```")[0]
-                    break
-            parsed = _json.loads(raw.strip())
-            if isinstance(parsed, dict):
-                parsed = parsed.get("tasks", parsed.get("daily_tasks", []))
-            if isinstance(parsed, list) and len(parsed) > 0:
-                tasks = parsed
-                break
-        except Exception as e:
-            print(f"[API] daily-tasks LLM attempt {attempt+1} error: {e}")
+            user_profile = _json.loads(user_profile)
+        except Exception:
+            user_profile = None
 
-    # 6. 标准化并保存
-    normalized = []
-    for i, t in enumerate(tasks):
-        if isinstance(t, str):
-            normalized.append({"title": t, "description": t, "duration": "30min", "difficulty": "中等"})
-        elif isinstance(t, dict):
-            normalized.append({
-                "title": t.get("title", t.get("content", f"任务{i+1}")),
-                "description": t.get("description", t.get("desc", "")),
-                "duration": t.get("duration", t.get("time", "30min")),
-                "difficulty": t.get("difficulty", "中等"),
-            })
+    # 6. 多步流水线生成任务
+    phase = phases[req.phase_index] if req.phase_index < len(phases) else phases[0]
+    tasks = await planner_generate(phase, target_job, user_profile=user_profile)
 
-    if normalized:
-        await tools.save_daily_tasks(uid, normalized, target_job)
-        print(f"[API] daily-tasks saved {len(normalized)} tasks for '{target_job}'")
+    if tasks:
+        await tools.save_daily_tasks(uid, tasks, target_job)
+        print(f"[API] daily-tasks saved {len(tasks)} tasks for '{target_job}'")
 
-    return {"success": True, "daily_tasks": normalized, "target_job": target_job}
+    return {"success": True, "daily_tasks": tasks, "target_job": target_job}
 
 
 @router.post("/adjust")

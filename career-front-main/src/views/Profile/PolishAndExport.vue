@@ -1,22 +1,28 @@
 <template>
   <div class="report-export-page fade-in">
     <div class="main-layout glass-card">
-      
+
       <div class="report-display-container" v-loading="pageLoading">
         <div class="paper-header">
-          <input v-model="reportData.reportTitle" class="title-input" :readonly="!isEditing" />
+          <div class="title-text">职业分析报告</div>
           <div class="paper-meta">最后更新：{{ lastUpdateTime }} | 导师：AI Career Pilot</div>
         </div>
-        
+
         <div class="paper-body">
-          <el-input
-            v-model="reportContent"
-            type="textarea"
-            :autosize="{ minRows: 22 }"
-            :readonly="!isEditing"
-            class="article-editor"
-            placeholder="正在生成报告内容..."
-          />
+          <div v-if="generating" class="generating-animation">
+            <div class="gen-spinner">
+              <div class="spinner-ring"></div>
+              <div class="spinner-ring delay-1"></div>
+              <div class="spinner-ring delay-2"></div>
+            </div>
+            <p class="gen-text">AI 正在分析你的个人数据并生成报告...</p>
+            <p class="gen-sub">聚合画像、匹配、学习计划、职业规划等模块数据</p>
+          </div>
+          <div v-else-if="reportContent" class="report-text">{{ reportContent }}</div>
+          <div v-else class="empty-hint">
+            <el-icon><Document /></el-icon>
+            <p>点击"生成报告"按钮，AI 将聚合你的所有数据生成完整职业分析报告</p>
+          </div>
         </div>
       </div>
 
@@ -25,7 +31,7 @@
           <div class="panel-label">
             <el-icon><MagicStick /></el-icon> 智能润色指令
           </div>
-          
+
           <div class="instruction-input-wrapper">
             <el-input
               v-model="polishNote"
@@ -35,9 +41,9 @@
               resize="none"
             />
             <div class="input-footer">
-              <el-button 
-                type="primary" 
-                @click="handleAIPolish" 
+              <el-button
+                type="primary"
+                @click="handleAIPolish"
                 :loading="polishing"
                 round
                 size="small"
@@ -49,7 +55,7 @@
           </div>
 
           <div class="quick-tags">
-            <el-tag v-for="tag in ['更专业', '更精简', '突出技术', '润色摘要']" 
+            <el-tag v-for="tag in ['更专业', '更精简', '突出技术', '增加细节', '调整语气']"
                     :key="tag" @click="polishNote = tag" class="tag-item">
               {{ tag }}
             </el-tag>
@@ -65,15 +71,15 @@
               <el-icon class="info-icon"><QuestionFilled /></el-icon>
             </el-tooltip>
           </div>
-          
+
           <div class="history-list-container">
             <div v-if="polishHistory.length === 0" class="empty-history">
               <el-icon><InfoFilled /></el-icon> 暂无润色记录
             </div>
-            
-            <div 
-              v-for="(item, index) in polishHistory" 
-              :key="index" 
+
+            <div
+              v-for="(item, index) in polishHistory"
+              :key="index"
               class="history-card"
               @click="restoreVersion(item)"
             >
@@ -92,14 +98,21 @@
         </div>
 
         <div class="action-group">
-          <el-button :type="isEditing ? 'warning' : 'default'" class="wide-btn" @click="toggleEdit">
-            <el-icon><EditPen v-if="!isEditing" /><Checked v-else /></el-icon>
-            {{ isEditing ? '保存修改' : '进入手动编辑' }}
+          <el-button type="primary" class="wide-btn generate-btn" @click="handleGenerate" :loading="generating">
+            <el-icon><Document /></el-icon> 生成报告
           </el-button>
 
-          <el-button type="success" class="wide-btn download-btn" @click="handleDownload" :loading="downloadLoading">
-            <el-icon><Download /></el-icon> 导出 PDF 最终版
-          </el-button>
+          <div class="export-row">
+            <el-button class="export-btn" @click="handleExport('txt')" :loading="exportingTxt">
+              <el-icon><Document /></el-icon> TXT
+            </el-button>
+            <el-button class="export-btn" @click="handleExport('docx')" :loading="exportingDocx">
+              <el-icon><Notebook /></el-icon> Word
+            </el-button>
+            <el-button class="export-btn" @click="handleExport('pdf')" :loading="exportingPdf">
+              <el-icon><Printer /></el-icon> PDF
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -111,175 +124,116 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import {
-  MagicStick, EditPen, Download, Promotion,
-  Checked, Clock, InfoFilled, RefreshLeft, QuestionFilled
+  MagicStick, Promotion, Clock, InfoFilled, RefreshLeft,
+  QuestionFilled, Document, Notebook, Printer
 } from '@element-plus/icons-vue'
-import html2pdf from 'html2pdf.js'
-import { learningPlanApi } from '@/api/learningPlan'
+import { reportApi } from '@/api/report'
 
-const props = defineProps({
-  reportData: {
-    type: Object,
-    default: () => ({
-      reportTitle: ''
-    })
-  }
+const pageLoading = ref(false)
+const generating = ref(false)
+const polishing = ref(false)
+const reportContent = ref('')
+const polishNote = ref('')
+const lastUpdateTime = ref('--')
+const polishHistory = ref([])
+
+const exportingTxt = ref(false)
+const exportingDocx = ref(false)
+const exportingPdf = ref(false)
+
+onMounted(() => {
+  pageLoading.value = false
 })
 
-const pageLoading = ref(true)
-const reportContent = ref('')
-
-// 从 learning_plan agent 获取报告
-const fetchReport = async () => {
+const handleGenerate = async () => {
+  generating.value = true
   try {
-    const { data } = await learningPlanApi.generate({ plan_type: '长期' })
-    if (data.learning_plan?.plan_text) {
-      reportContent.value = data.learning_plan.plan_text
-    } else if (data.learning_plan?.content) {
-      reportContent.value = data.learning_plan.content
-    } else if (data.export_text) {
-      reportContent.value = data.export_text
+    const { data } = await reportApi.generate()
+    if (data.report_text) {
+      reportContent.value = data.report_text
+      lastUpdateTime.value = new Date().toLocaleTimeString()
+      ElMessage.success('报告生成成功')
     } else {
-      reportContent.value = ''
+      ElMessage.warning('报告内容为空')
     }
-    ElMessage({ message: '职业规划报告已生成', type: 'success', plain: true })
   } catch {
-    reportContent.value = ''
-    ElMessage.warning('获取报告失败，请检查后端服务是否运行')
+    ElMessage.error('报告生成失败，请重试')
   } finally {
-    pageLoading.value = false
+    generating.value = false
   }
 }
 
-onMounted(() => {
-  fetchReport()
-})
-
-// 状态管理
-const polishNote = ref('')
-const isEditing = ref(false)
-const polishing = ref(false)
-const downloadLoading = ref(false)
-const lastUpdateTime = ref(new Date().toLocaleTimeString())
-
-
-
-
-// 历史记录数据
-const polishHistory = ref([])
-
-// 逻辑：执行润色并存入历史
 const handleAIPolish = async () => {
   if (!polishNote.value) return ElMessage.warning('请输入润色要求')
   polishing.value = true
 
   try {
-    // 存档当前内容
     polishHistory.value.unshift({
       note: polishNote.value,
       content: reportContent.value,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'ai'
+      type: 'ai',
     })
 
-    // 调用 learning_plan agent 润色
-    const { data } = await learningPlanApi.polish({ user_feedback: polishNote.value })
-    if (data.learning_plan?.plan_text) {
-      reportContent.value = data.learning_plan.plan_text
-    } else if (data.export_text) {
-      reportContent.value = data.export_text
-    } else if (data.result) {
-      reportContent.value = data.result
+    const { data } = await reportApi.polish(polishNote.value)
+    if (data.report_text) {
+      reportContent.value = data.report_text
+      lastUpdateTime.value = new Date().toLocaleTimeString()
     }
 
-    polishing.value = false
     polishNote.value = ''
-    lastUpdateTime.value = new Date().toLocaleTimeString()
-
     ElNotification({
       title: '润色完成',
       message: '旧版本已存入历史，可随时切换回滚',
       type: 'success',
-      position: 'bottom-right'
+      position: 'bottom-right',
     })
   } catch {
     ElMessage.error('润色失败，请重试')
+  } finally {
     polishing.value = false
   }
 }
 
-// 逻辑：还原版本（含双向备份）
 const restoreVersion = (item) => {
-  // 1. 获取当前屏幕上的"即将被覆盖"的内容作为快照
   const currentSnapshot = {
-    note: "还原前的当前版本",
+    note: '还原前的当前版本',
     content: reportContent.value,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    type: 'user' // 绿色标签标记
-  };
-
-  // 2. 从历史列表中移除要还原的那一项
-  const index = polishHistory.value.indexOf(item);
-  if (index > -1) {
-    polishHistory.value.splice(index, 1);
+    type: 'user',
   }
-
-  // 3. 将当前快照压入历史顶部
-  polishHistory.value.unshift(currentSnapshot);
-
-  // 4. 更新正文
-  reportContent.value = item.content;
-  lastUpdateTime.value = new Date().toLocaleTimeString();
-  
-  ElMessage.info('已切换版本，原内容已自动备份');
+  const index = polishHistory.value.indexOf(item)
+  if (index > -1) polishHistory.value.splice(index, 1)
+  polishHistory.value.unshift(currentSnapshot)
+  reportContent.value = item.content
+  lastUpdateTime.value = new Date().toLocaleTimeString()
+  ElMessage.info('已切换版本，原内容已自动备份')
 }
 
-const toggleEdit = () => {
-  isEditing.value = !isEditing.value
-  if (!isEditing.value) ElMessage.success('手动修改已保存')
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
-const handleDownload = async () => {
-  downloadLoading.value = true
-
-  // 首先调用 export API 获取最新内容
+const handleExport = async (format) => {
+  const loadingMap = { txt: exportingTxt, docx: exportingDocx, pdf: exportingPdf }
+  loadingMap[format].value = true
   try {
-    const { data } = await learningPlanApi.export({})
-    if (data.export_text) {
-      reportContent.value = data.export_text
-    }
+    const resp = await reportApi.exportFile(format)
+    const extMap = { txt: 'txt', docx: 'docx', pdf: 'pdf' }
+    downloadBlob(resp.data, `职业分析报告.${extMap[format]}`)
+    ElMessage.success(`${format.toUpperCase()} 导出成功`)
   } catch {
-    // 继续使用当前内容
+    ElMessage.error('导出失败，请先生成报告')
+  } finally {
+    loadingMap[format].value = false
   }
-
-  const element = document.querySelector('.report-display-container')
-  if (!element) {
-    ElMessage.error('未找到报告内容')
-    downloadLoading.value = false
-    return
-  }
-
-  const opt = {
-    margin: [10, 10],
-    filename: `${props.reportData.reportTitle || '职业规划报告'}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  }
-
-  html2pdf()
-    .set(opt)
-    .from(element)
-    .save()
-    .then(() => {
-      downloadLoading.value = false
-      ElMessage.success('PDF 导出成功')
-    })
-    .catch((err) => {
-      console.error('导出失败:', err)
-      downloadLoading.value = false
-      ElMessage.error('导出失败，请重试')
-    })
 }
 </script>
 
@@ -320,18 +274,72 @@ const handleDownload = async () => {
     margin-bottom: 25px;
     border-bottom: 1px solid #f1f5f9;
     padding-bottom: 15px;
-    .title-input {
-      border: none; outline: none; font-size: 26px; font-weight: bold; width: 100%; color: #1e293b;
-      background: transparent;
+    .title-text {
+      font-size: 26px;
+      font-weight: bold;
+      color: #1e293b;
     }
     .paper-meta { font-size: 12px; color: #94a3b8; margin-top: 5px; }
   }
 
-  .article-editor {
-    :deep(.el-textarea__inner) {
-      border: none !important; box-shadow: none !important;
-      padding: 0; font-size: 16px; line-height: 1.8; color: #334155;
-      background: transparent;
+  .paper-body {
+    .report-text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 15px;
+      line-height: 1.85;
+      color: #334155;
+    }
+    .empty-hint {
+      text-align: center;
+      padding: 80px 0;
+      color: #94a3b8;
+      .el-icon { font-size: 48px; margin-bottom: 16px; }
+      p { font-size: 14px; }
+    }
+    .generating-animation {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 0;
+      .gen-spinner {
+        position: relative;
+        width: 64px;
+        height: 64px;
+        margin-bottom: 28px;
+        .spinner-ring {
+          position: absolute;
+          inset: 0;
+          border: 3px solid transparent;
+          border-top-color: #70a1ff;
+          border-radius: 50%;
+          animation: spin 1.2s linear infinite;
+          &.delay-1 {
+            inset: 6px;
+            border-top-color: #a78bfa;
+            animation-delay: 0.15s;
+            animation-duration: 1s;
+          }
+          &.delay-2 {
+            inset: 12px;
+            border-top-color: #f472b6;
+            animation-delay: 0.3s;
+            animation-duration: 0.8s;
+          }
+        }
+      }
+      .gen-text {
+        font-size: 16px;
+        font-weight: 600;
+        color: #334155;
+        margin: 0 0 8px;
+      }
+      .gen-sub {
+        font-size: 13px;
+        color: #94a3b8;
+        margin: 0;
+      }
     }
   }
 }
@@ -343,25 +351,22 @@ const handleDownload = async () => {
   height: 100%;
   overflow: hidden;
 
-  /* 🌟 修正：统一 ai-assistant-box 样式，确保毛玻璃生效 */
   .ai-assistant-box {
     flex-shrink: 0;
-    background: rgba(255, 255, 255, 0.2) !important; // 极高的透明度
+    background: rgba(255, 255, 255, 0.2) !important;
     backdrop-filter: blur(12px) saturate(180%) !important;
     padding: 20px !important;
     border-radius: 20px !important;
-    border: 1px solid rgba(255, 255, 255, 0.4) !important; // 强调白色边缘
-    box-shadow: none !important; // 去掉沉重的阴影
-    margin-bottom: 0; // 移除多余间距
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: none !important;
 
-    /* 🌟 核心修改：输入框包装器模拟图一的纯白悬浮感 */
     .instruction-input-wrapper {
-      background: #ffffff !important; // 改为纯白
+      background: #ffffff !important;
       border-radius: 12px;
       padding: 12px;
-      border: none !important; // 移除图二看到的灰色边框
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important; // 极淡阴影增加层级
-      
+      border: none !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+
       :deep(.el-textarea__inner) {
         border: none !important;
         box-shadow: none !important;
@@ -410,7 +415,7 @@ const handleDownload = async () => {
 
   .history-module {
     flex: 1;
-    background: rgba(255, 255, 255, 0.2) !important; // 极高的透明度
+    background: rgba(255, 255, 255, 0.2) !important;
     padding: 18px;
     border-radius: 16px;
     border: 1px solid #eef2f6;
@@ -473,11 +478,13 @@ const handleDownload = async () => {
       padding: 4px 12px !important;
       font-weight: 500;
       border-radius: 8px !important;
+      cursor: pointer;
       transition: all 0.2s !important;
       &:nth-child(1) { background: rgba(165, 220, 252, 0.185) !important; color: #262626 !important; }
       &:nth-child(2) { background: rgba(253, 181, 230, 0.1) !important; color: #262626 !important; }
       &:nth-child(3) { background: rgba(198, 238, 198, 0.161) !important; color: #262626 !important; }
       &:nth-child(4) { background: rgba(253, 186, 116, 0.1) !important; color: #262626 !important; }
+      &:nth-child(5) { background: rgba(200, 180, 255, 0.1) !important; color: #262626 !important; }
       &:hover { background: #ffffff !important; border-color: currentColor !important; transform: scale(1.05); }
     }
   }
@@ -493,24 +500,41 @@ const handleDownload = async () => {
   }
 }
 
-.wide-btn {
-  background: linear-gradient(135deg, #f2fbfd 0%, #e6f7fc5d 100%) !important;
-  border: 1.5px dashed #e2e8f0 !important;
-  color: rgb(74, 72, 72) !important;
+.generate-btn {
+  background: linear-gradient(135deg, #70a1ff 0%, #5b8def 100%) !important;
+  border: none !important;
+  color: #fff !important;
   width: 100% !important;
   max-width: 320px;
   height: 48px !important;
-  margin: 0 !important;
   border-radius: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-sizing: border-box !important;
   font-weight: bold;
   font-size: 14px;
-  box-sizing: border-box;
-  padding: 0 20px !important;
   .el-icon { margin-right: 8px; font-size: 16px; }
+  &:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 20px rgba(112, 161, 255, 0.3) !important;
+  }
+}
+
+.export-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.export-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #f2fbfd 0%, #e6f7fc5d 100%) !important;
+  border: 1.5px dashed #e2e8f0 !important;
+  color: rgb(74, 72, 72) !important;
+  height: 42px !important;
+  border-radius: 10px !important;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 0 8px !important;
+  .el-icon { margin-right: 4px; font-size: 14px; }
   &:hover {
     border-style: solid !important;
     border-color: #113354 !important;
@@ -519,15 +543,7 @@ const handleDownload = async () => {
   }
 }
 
-.download-btn {
-  margin: 0 !important;
-  background: linear-gradient(135deg, #f2fbfd 0%, #e6f7fc5d 100%) !important;
-  color: rgb(74, 72, 72) !important;
-  font-weight: bold;
-  box-shadow: 0 6px 18px rgba(45, 212, 191, 0.15) !important;
-  &:hover { box-shadow: 0 8px 25px rgba(45, 212, 191, 0.25) !important; filter: saturate(1.1); }
-}
-
 .fade-in { animation: fadeIn 0.6s ease-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>

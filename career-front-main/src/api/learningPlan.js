@@ -19,7 +19,7 @@ export const learningPlanApi = {
     return api.post('/learning-plan/polish', data)
   },
   dailyTasks(data) {
-    return api.post('/learning-plan/daily-tasks', data)
+    return api.post('/learning-plan/daily-tasks', data, { timeout: 120000 })
   },
   adjust(data) {
     return api.post('/learning-plan/adjust', data)

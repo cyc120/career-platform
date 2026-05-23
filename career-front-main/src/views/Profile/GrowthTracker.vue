@@ -333,7 +333,9 @@ const restoreFromCache = () => {
 // 获取所有数据并保存到缓存
 const fetchAllDataAndCache = async (cacheKey) => {
   startLoadingAnimation()
-  await Promise.all([fetchLearningPlan(), fetchDailyTasks(), fetchCapabilityModel()])
+  // 必须先生成学习计划，再获取每日任务（任务依赖计划存在）
+  await fetchLearningPlan()
+  await Promise.all([fetchDailyTasks(), fetchCapabilityModel()])
   stopLoadingAnimation()
 
   // 保存到缓存
@@ -414,41 +416,43 @@ const fetchLearningPlan = async () => {
   }
 }
 
+const normalizeTasks = (tasks) => {
+  return tasks.map((t, i) => ({
+    id: t.id || i + 1,
+    text: t.content || t.title || t.task || `任务 ${i + 1}`,
+    desc: t.description || t.desc || '',
+    time: t.estimated_time || t.time || t.duration || '30',
+    difficulty: t.difficulty || t.type || '中等',
+    completed: false,
+    isAI: true,
+  }))
+}
+
 const fetchDailyTasks = async () => {
   try {
     const { data } = await learningPlanApi.dailyTasks({ phase_index: 0, _t: Date.now() })
+    console.log('[GrowthTracker] fetchDailyTasks response:', data)
 
-    // 验证返回的任务是否匹配当前锁定岗位
     const expectedJob = selectedJob.value?.job_title || targetPosition.value || ''
     const returnedJob = data.target_job || ''
-    if (expectedJob && returnedJob && expectedJob !== returnedJob) {
-      console.warn(`[GrowthTracker] job mismatch: expected=${expectedJob}, got=${returnedJob}, retrying...`)
-      const { data: retry } = await learningPlanApi.dailyTasks({ phase_index: 0, force_refresh: true })
+
+    // 岗位不匹配或任务为空 → 强制刷新重试
+    const needRetry = (expectedJob && returnedJob && expectedJob !== returnedJob)
+      || (!data.daily_tasks || data.daily_tasks.length === 0)
+
+    if (needRetry) {
+      console.warn(`[GrowthTracker] daily tasks need retry: mismatch=${expectedJob !== returnedJob}, empty=${!data.daily_tasks?.length}`)
+      const { data: retry } = await learningPlanApi.dailyTasks({ phase_index: 0, force_refresh: true, _t: Date.now() })
       if (retry.daily_tasks && retry.daily_tasks.length > 0) {
-        todoList.value = retry.daily_tasks.map((t, i) => ({
-          id: t.id || i + 1,
-          text: t.content || t.title || t.task || `任务 ${i + 1}`,
-          desc: t.description || t.desc || '',
-          time: t.estimated_time || t.time || t.duration || '30',
-          difficulty: t.difficulty || t.type || '中等',
-          completed: false,
-          isAI: true,
-        }))
+        todoList.value = normalizeTasks(retry.daily_tasks)
+        return
       }
+      // 二次重试仍为空，设置提示
+      console.warn('[GrowthTracker] daily tasks still empty after retry')
       return
     }
 
-    if (data.daily_tasks && data.daily_tasks.length > 0) {
-      todoList.value = data.daily_tasks.map((t, i) => ({
-        id: t.id || i + 1,
-        text: t.content || t.title || t.task || `任务 ${i + 1}`,
-        desc: t.description || t.desc || '',
-        time: t.estimated_time || t.time || t.duration || '30',
-        difficulty: t.difficulty || t.type || '中等',
-        completed: false,
-        isAI: true,
-      }))
-    }
+    todoList.value = normalizeTasks(data.daily_tasks)
   } catch (err) {
     console.error('[GrowthTracker] fetchDailyTasks error:', err)
   }
