@@ -33,6 +33,7 @@ class LearningPlanAgent(AgentBase):
     def build_graph(self) -> StateGraph:
         builder = StateGraph(LearningPlanState)
 
+        builder.add_node("detect_action", nodes.detect_action_node)
         builder.add_node("load_profile_and_job", nodes.load_profile_and_job)
         builder.add_node("retrieve_resources", nodes.retrieve_resources)
         builder.add_node("generate_plan", nodes.generate_plan)
@@ -76,6 +77,7 @@ class LearningPlanAgent(AgentBase):
             "phase_index": input_data.get("phase_index", 0),
             "completed_task_ids": input_data.get("completed_task_ids", []),
             "remaining_tasks": input_data.get("remaining_tasks", []),
+            "target_job": input_data.get("target_job", ""),
         })
 
         return {

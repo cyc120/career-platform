@@ -13,10 +13,16 @@
         <el-icon><Connection /></el-icon>
         <span>人岗匹配</span>
       </el-menu-item>
-      <el-menu-item index="growth">
-        <el-icon><TrendCharts /></el-icon>
-        <span>成长追踪中心</span>
-      </el-menu-item>
+      <el-tooltip
+        :disabled="hasMatchData"
+        content="请先完成人岗匹配后再使用"
+        placement="right"
+      >
+        <el-menu-item index="growth" :disabled="!hasMatchData" :class="{ 'is-disabled-custom': !hasMatchData }">
+          <el-icon><TrendCharts /></el-icon>
+          <span>成长追踪中心</span>
+        </el-menu-item>
+      </el-tooltip>
       <el-menu-item index="report-export">
         <el-icon><DocumentCopy /></el-icon>
         <span>报告优化与导出</span>
@@ -177,8 +183,13 @@
         <div v-else-if="activeTab === 'match'" class="sub-page">
           <JobMatch />
         </div>
-        <div v-else-if="activeTab === 'growth'" class="sub-page">
-          <GrowthTracker />
+        <div v-else-if="activeTab === 'growth' && hasMatchData" class="sub-page">
+          <GrowthTracker :key="selectedJob?.job_title || 'default'" />
+        </div>
+        <div v-else-if="activeTab === 'growth' && !hasMatchData" class="sub-page">
+          <div class="empty-state">
+            <el-empty description="请先完成人岗匹配后再使用成长追踪中心" />
+          </div>
         </div>
         <div v-else-if="activeTab === 'report-export'" class="sub-page">
           <PolishAndExport />
@@ -203,8 +214,8 @@ const _moduleState = {
 </script>
 
 <script setup>
-import { ref, nextTick, computed, onMounted, onUnmounted } from 'vue'
-import { Upload, Connection } from '@element-plus/icons-vue'
+import { ref, nextTick, computed, onMounted, onUnmounted, provide } from 'vue'
+import { Upload, Connection, User, TrendCharts, DocumentCopy, Star, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { learningPlanApi } from '@/api/learningPlan'
 import * as mammoth from 'mammoth'
@@ -237,13 +248,15 @@ const extractFileText = async (file) => {
 
   // PDF / doc 等格式：转 base64 发给后端解析
   if (ext === 'pdf' || ext === 'doc') {
-    const buffer = await file.arrayBuffer()
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    const base64 = btoa(binary)
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result
+        resolve(dataUrl.split(',')[1])
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
 
     const token = localStorage.getItem('access_token')
     const resp = await fetch('http://localhost:8000/api/v1/learning-plan/parse-file', {
@@ -309,6 +322,14 @@ const userInfo = ref(_moduleState.userInfo)
 // isInfoFilled 不持久化，切回来时显示聊天界面
 const isInfoFilled = ref(false)
 
+// 匹配数据状态 — 控制成长追踪中心是否可用
+const hasMatchData = ref(false)
+provide('hasMatchData', hasMatchData)
+
+// 当前锁定的岗位 — 成长追踪中心根据此岗位刷新数据
+const selectedJob = ref(null)
+provide('selectedJob', selectedJob)
+
 // --- 聊天状态（使用模块级数据，SPA 内切换保留） ---
 const currentStepIndex = ref(_moduleState.currentStepIndex)
 const chatMessages = ref(_moduleState.chatMessages)
@@ -336,6 +357,19 @@ onMounted(() => {
   if (chatMessages.value.length === 0) {
     initChatGreeting()
   }
+  // 检查是否有实际的匹配缓存数据，且用户已填写个人信息（雷达数据不全为0）
+  try {
+    const raw = sessionStorage.getItem('job_match_cache')
+    const hasRadarData = currentRadarData.value && currentRadarData.value.some(v => v > 0)
+    if (raw && hasRadarData) {
+      const cached = JSON.parse(raw)
+      hasMatchData.value = cached.results && cached.results.length > 0
+    } else {
+      hasMatchData.value = false
+    }
+  } catch {
+    hasMatchData.value = false
+  }
 })
 
 // 组件销毁前同步状态到模块级变量
@@ -348,6 +382,11 @@ onUnmounted(() => {
 
 // 🌟 修复核心：确保菜单选择逻辑能干净地切换 activeTab
 const handleMenuSelect = (index) => {
+  // 人岗匹配未完成时，禁止切换到成长追踪中心
+  if (index === 'growth' && !hasMatchData.value) {
+    ElMessage.warning('请先完成人岗匹配后再使用成长追踪中心')
+    return
+  }
   activeTab.value = index
 }
 
@@ -503,126 +542,155 @@ const completionLabel = computed(() => {
 .personal-center {
   display: flex;
   min-height: 100vh;
+  background: #f0f2f8;
+  background-image:
+    radial-gradient(at 20% 20%, rgba(102, 126, 234, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(118, 75, 162, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(64, 158, 255, 0.04) 0px, transparent 60%);
 }
 
 /* 侧边栏整体重构 */
 .sidebar {
-  width: 260px;
-  height: 93vh;
-  background: rgba(255, 255, 255, 0.4); /* 半透明背景 */
-  backdrop-filter: blur(20px); /* 毛玻璃效果 */
-  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  width: 240px;
+  height: 100vh;
+  background: linear-gradient(180deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.06) 50%, rgba(255, 255, 255, 0.3) 100%);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
   z-index: 100;
+  box-shadow: 4px 0 20px rgba(102, 126, 234, 0.06);
 
   .avatar-placeholder {
-    padding: 50px 0 30px;
+    padding: 40px 0 28px;
     text-align: center;
-    
+
     .el-avatar {
-      box-shadow: 0 8px 16px rgba(118, 75, 162, 0.2);
-      border: 2px solid #fff;
-      transition: transform 0.3s ease;
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+      border: 3px solid rgba(255, 255, 255, 0.9);
+      transition: all 0.3s ease;
       &:hover {
-        transform: scale(1.05);
+        transform: scale(1.08);
+        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.35);
       }
     }
   }
 
-  /* 菜单样式定制 */
   /* 菜单样式定制 */
   .el-menu {
     border: none;
     background: transparent;
-    padding: 0 16px 20px;
-    
-    /* 🌟 必须：开启 flex 布局 */
+    padding: 0 12px 20px;
     display: flex;
     flex-direction: column;
-    height: calc(100% - 160px); /* 减去上方头像占用的空间 */
+    height: calc(100% - 140px);
 
     .el-menu-item {
-      height: 54px;
-      line-height: 54px;
-      margin-bottom: 8px;
-      border-radius: 12px;
-      color: #64748b;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      height: 48px;
+      line-height: 48px;
+      margin-bottom: 6px;
+      border-radius: 14px;
+      color: #475569;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 3px;
+        height: 100%;
+        background: linear-gradient(180deg, #667eea, #764ba2);
+        border-radius: 0 4px 4px 0;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+
+      :deep(.el-icon) {
+        font-size: 18px;
+        transition: all 0.25s ease;
+      }
 
       span {
         font-weight: 500;
         margin-left: 8px;
+        font-size: 14px;
       }
 
       /* 鼠标悬停 */
       &:hover {
-        background: rgba(186, 211, 246, 0.318) !important;
-        color: #68788c;
-        transform: translateX(4px);
+        background: rgba(102, 126, 234, 0.1) !important;
+        color: #4f46e5;
+
+        :deep(.el-icon) {
+          color: #667eea;
+        }
       }
 
       /* 激活状态 */
       &.is-active {
-        background: linear-gradient(135deg, #bbd7f6a3 0%, #ffffffb6 100%) !important;
-        color: #221b4f !important;
-        box-shadow: 0 4px 12px rgba(75, 98, 162, 0.3);
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+        color: #4f46e5 !important;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+
+        &::before {
+          opacity: 1;
+        }
+
+        :deep(.el-icon) {
+          color: #667eea;
+        }
       }
 
 &.menu-item-bottom {
   margin-top: auto !important;
-  margin-bottom: 20px;
-  
-  /* 🌟 1. 强制去掉任何背景色和边框，保持透明 */
+  margin-bottom: 16px;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  backdrop-filter: none !important;
 
-  /* 文字和图标默认状态 */
   span {
     font-size: 14px;
-    color: #64748b;
-    transition: all 0.3s ease; /* 确保字号变化平滑 */
+    color: #475569;
+    transition: all 0.25s ease;
   }
-  
+
   :deep(.el-icon) {
     font-size: 18px;
     color: #64748b;
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
   }
 
-  /* 🌟 2. 鼠标悬停：只改颜色和字号 */
   &:hover {
-    background: transparent !important; /* 再次确保没有背景 */
-    transform: none !important;        /* 去掉之前的位移动画 */
-    
+    background: transparent !important;
+    transform: none !important;
+
     span {
-      color: #4f46e5 !important;       /* 变成深紫色 */
-      font-size: 16px !important;      /* 字号变大 */
+      color: #667eea !important;
       font-weight: 600 !important;
     }
-    
+
     :deep(.el-icon) {
-      color: #4f46e5 !important;       /* 图标同步变色 */
-      font-size: 20px !important;      /* 图标同步变大 */
+      color: #667eea !important;
     }
   }
 
-  /* 🌟 3. 点击选中（激活状态）：只改颜色和字号 */
   &.is-active {
-    background: transparent !important; /* 强制透明 */
+    background: transparent !important;
     box-shadow: none !important;
-    
+
     span {
-      color: #1e1b4b !important;       /* 选中的文字颜色更深 */
-      font-size: 16px !important;      /* 保持变大的状态 */
+      color: #4f46e5 !important;
       font-weight: 700 !important;
     }
-    
+
     :deep(.el-icon) {
-      color: #1e1b4b !important;
+      color: #4f46e5 !important;
       font-size: 20px !important;
     }
   }
@@ -633,13 +701,13 @@ const completionLabel = computed(() => {
 
 /* 找到 .chat-section 下的 .chat-header 样式进行替换 */
 .chat-header {
-  padding: 16px 24px; /* 增加内边距更显轻盈 */
+  padding: 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03); /* 极细的分割线 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
   transition: all 0.3s ease;
 
   .header-left {
@@ -734,13 +802,24 @@ const completionLabel = computed(() => {
 .main-content {
   flex: 1;
   padding: 24px;
-  background-color: #f1f5f9 !important;
-  background-image: 
-    /* 荧光紫 */
-    radial-gradient(at 100% 100%, rgba(242, 181, 120, 0.271) 0px, transparent 40%),
-    /* 顶部中心的一抹亮白 */
-    radial-gradient(at 10% 0%, rgba(252, 252, 231, 0.8) 0px, transparent 30%) !important;
+  background: transparent;
   overflow-y: auto;
+  position: relative;
+
+  &::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 260px;
+    right: 0;
+    bottom: 0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(102, 126, 234, 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(118, 75, 162, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(64, 158, 255, 0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
 }
 
 
@@ -771,12 +850,14 @@ const completionLabel = computed(() => {
 .chat-section {
   flex: 1.2;
   display: flex;
-  flex-direction: column; /* 纵向排版，让 message-list 能撑开 */
-  background: rgba(243, 247, 250, 0.233);
-  border-radius: 20px;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-  border: 2px solid rgba(22, 40, 90, 0.034) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.6);
 
 
   .message-list {
@@ -790,20 +871,21 @@ const completionLabel = computed(() => {
 .dashboard-preview-section {
   flex: 0.8;
   min-width: 0;
-  display: flex;       /* 新增：开启 flex 模式 */
-  flex-direction: column; /* 新增 */
-  border-radius: 20px;
-  border: 2px solid rgba(22, 40, 90, 0.034) !important;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
 
   .artifact-card {
-    flex: 1;           /* 核心修改：强制卡片填满整个 section 的高度 */
+    flex: 1;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(20px);
-    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px) saturate(1.1);
+    -webkit-backdrop-filter: blur(20px) saturate(1.1);
+    border-radius: 24px;
     padding: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
 
     /* 让内部的雷达图占位符也撑开 */
     .preview-radar-placeholder {
@@ -821,31 +903,25 @@ const completionLabel = computed(() => {
 
 /* 5. 底部按钮区域 */
 .bottom-action-bar {
-  flex-shrink: 0;      /* 防止按钮被压缩 */
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
   padding: 10px 0;
-  /* 在 SCSS 中找到或添加 .analyze-btn 的样式 */
+
 .analyze-btn {
-  /* 🌟 使用菜单同款渐变色 */
-  background: linear-gradient(135deg, #fdfdfc 0%, #ebf2f6bb 100%) !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   border: none !important;
-  color: rgb(23, 59, 105) !important;
-  
-  /* 增加阴影使其更有悬浮感 */
-  box-shadow: 0 4px 15px rgba(75, 104, 162, 0.3);
+  color: #fff !important;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  
-  /* 调整按钮形状与整体圆角风格一致 */
-  border-radius: 12px;
-  padding: 12px 28px !important;
+  border-radius: 14px;
+  padding: 12px 32px !important;
   font-weight: 600;
+  letter-spacing: 0.5px;
 
   &:hover {
-    /* 悬浮时轻微放大并加强阴影 */
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(75, 100, 162, 0.4);
-    opacity: 0.9;
+    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.45);
   }
 
   &:active {
@@ -880,33 +956,34 @@ const completionLabel = computed(() => {
       .ai-icon {
         width: 36px;
         height: 36px;
-        background: linear-gradient(135deg, #989fed 0%, #153674c7 100%);
-        border-radius: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
         font-size: 18px;
-        box-shadow: 0 4px 12px rgba(118, 75, 162, 0.2);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
       }
       .message-bubble {
-        background: #fff;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
         color: #334155;
-        border-radius: 16px 16px 16px 4px; /* 非对称圆角 */
-        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        border-radius: 16px 16px 16px 4px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.6);
       }
     }
 
     /* 用户样式 */
     &.user {
-      flex-direction: row-reverse; /* 头像在右侧 */
+      flex-direction: row-reverse;
       align-self: flex-end;
       .message-bubble {
-        /* 采用更有层次的紫色渐变 */
-        background: linear-gradient(135deg, #57a6ec 0%, #5779e999 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border-radius: 16px 16px 4px 16px;
-        box-shadow: 0 8px 20px rgba(118, 75, 162, 0.15);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
       }
       .message-time { text-align: right; }
     }
@@ -941,21 +1018,21 @@ const completionLabel = computed(() => {
 /* 消息输入区域轻量化 */
 .chat-input-area {
   padding: 24px;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(0, 0, 0, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
 
   .input-container {
-    background: white;
+    background: rgba(255, 255, 255, 0.7);
     padding: 12px;
     border-radius: 16px;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
     transition: all 0.3s ease;
 
     &:focus-within {
       border-color: #667eea;
-      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.1);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.12);
     }
 
     :deep(.el-textarea__inner) {
@@ -1014,42 +1091,40 @@ const completionLabel = computed(() => {
   }
   /* 发送按钮美化 */
   .send-btn {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border: none;
-    /* 配合你整体的紫色调渐变 */
-    background: linear-gradient(135deg, #8798de 0%, #1d3082 100%);
-    box-shadow: 0 4px 12px rgba(75, 100, 162, 0.3);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {
-      transform: scale(1.1) rotate(-10deg);
-      box-shadow: 0 6px 16px rgba(75, 111, 162, 0.4);
+      transform: scale(1.1);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.45);
     }
 
     &:active {
       transform: scale(0.95);
     }
 
-    /* 调整图标位置 */
     :deep(.el-icon) {
       font-size: 18px;
-      margin-left: 2px; /* 修正纸飞机图标的视觉中心偏差 */
     }
   }
 }
 
 /* 顺便优化一下输入框容器，增加整体高级感 */
 .input-container {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.7);
   padding: 12px;
   border-radius: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
-  transition: border-color 0.3s;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 
   &:focus-within {
     border-color: #667eea !important;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.12);
   }
 }
 
@@ -1087,12 +1162,19 @@ const completionLabel = computed(() => {
   }
 }
 
-.sub-page { animation: fadeIn 0.4s ease-out; }
+.sub-page {
+  animation: fadeIn 0.4s ease-out;
+}
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 .dashboard-result-view {
-  animation: slideUp 0.6s ease-out; // 向上滑入动画
+  animation: slideUp 0.6s ease-out;
   padding: 20px;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 @keyframes slideUp {
@@ -1275,6 +1357,29 @@ const completionLabel = computed(() => {
     line-height: 1.5;
     margin: 0;
   }
+}
+
+// 自定义禁用状态样式
+.is-disabled-custom {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+
+  &:hover {
+    background-color: transparent !important;
+  }
+}
+
+// 空状态样式
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 </style>

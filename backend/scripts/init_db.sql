@@ -120,6 +120,13 @@ CREATE TABLE IF NOT EXISTS daily_tasks (
 
 CREATE INDEX IF NOT EXISTS idx_daily_tasks_user_status ON daily_tasks(user_id, status);
 
+CREATE TABLE IF NOT EXISTS user_selected_job (
+    user_id INTEGER NOT NULL PRIMARY KEY,
+    job_data TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS agent_runs (
     id VARCHAR(36) PRIMARY KEY,
     agent_id VARCHAR(50) NOT NULL,

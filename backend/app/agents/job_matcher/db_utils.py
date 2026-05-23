@@ -106,3 +106,56 @@ async def save_analysis_result(user_id: int, analysis: dict,
         )
         await db.commit()
     return True
+
+
+async def save_selected_job(user_id: int, job_data: dict) -> bool:
+    import json
+    from app.config import settings
+    jd = json.dumps(job_data, ensure_ascii=False)
+    job_title = job_data.get("job_title", "")
+    print(f"[DB] save_selected_job: user_id={user_id}, job_title='{job_title}', json_len={len(jd)}")
+    async with AsyncSessionLocal() as db:
+        if settings.DB_BACKEND == "sqlite":
+            await db.execute(
+                text(
+                    "INSERT OR REPLACE INTO user_selected_job (user_id, job_data, updated_at) "
+                    "VALUES (:uid, :jd, datetime('now'))"
+                ),
+                {"uid": user_id, "jd": jd},
+            )
+        else:
+            await db.execute(
+                text(
+                    "INSERT INTO user_selected_job (user_id, job_data) "
+                    "VALUES (:uid, :jd) "
+                    "ON DUPLICATE KEY UPDATE job_data = :jd2, updated_at = NOW()"
+                ),
+                {"uid": user_id, "jd": jd, "jd2": jd},
+            )
+        # 切换岗位时清除旧的每日任务，避免返回旧岗位的缓存任务
+        await db.execute(
+            text("DELETE FROM daily_tasks WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        await db.commit()
+    return True
+
+
+async def get_selected_job(user_id: int) -> dict | None:
+    import json
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            text("SELECT job_data FROM user_selected_job WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        row = result.fetchone()
+        if row:
+            try:
+                data = json.loads(row[0])
+                print(f"[DB] get_selected_job: user_id={user_id}, job_title='{data.get('job_title', '')}'")
+                return data
+            except Exception:
+                print(f"[DB] get_selected_job: user_id={user_id}, JSON parse error")
+                return None
+        print(f"[DB] get_selected_job: user_id={user_id}, no row found")
+        return None

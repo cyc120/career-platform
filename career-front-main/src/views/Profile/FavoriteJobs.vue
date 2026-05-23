@@ -102,42 +102,40 @@ const removeFavorite = async (jobId) => {
   padding: 10px;
   overflow-y: auto;
 
-  /* 自定义滚动条 */
   &::-webkit-scrollbar { width: 5px; }
   &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+  &::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 10px; }
 }
 
 .job-list {
   flex: 1;
-  /* 删掉之前的 grid-template-columns */
   display: flex;
-  flex-direction: column; /* 改为垂直列表 */
-  gap: 16px; 
+  flex-direction: column;
+  gap: 16px;
 }
 
 .job-explorer {
-  background-color: #f5f7fa; /* 淡淡的灰色/蓝色背景，衬托白色卡片 */
+  background: transparent;
   min-height: 100vh;
 }
-
-
 
 .job-card {
   display: flex;
   gap: 20px;
   padding: 20px;
-  background: #ffffff;
-  border: 1px solid #f1f5f9;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 24px rgba(148, 163, 184, 0.1);
-    border-color: #3b82f6;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   /* 左侧 Logo 占位：同步图三样式 */

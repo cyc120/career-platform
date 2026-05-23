@@ -6,6 +6,20 @@ from app.db.mysql import AsyncSessionLocal
 
 
 async def get_top_matched_job(user_id: int) -> dict | None:
+    # 优先查询用户锁定的岗位
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            text("SELECT job_data FROM user_selected_job WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        row = result.fetchone()
+        if row:
+            try:
+                return json.loads(row[0])
+            except Exception:
+                pass
+
+    # 回退到匹配报告中得分最高的岗位
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             text(

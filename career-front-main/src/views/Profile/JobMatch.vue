@@ -21,24 +21,18 @@
         </el-button>
       </div>
 
-      <!-- 加载状态 -->
+      <!-- 加载状态 - 首页风格 -->
       <div v-if="loading" class="loading-section">
-        <div class="loading-card glass-card">
-          <div class="loading-animation">
-            <div class="pulse-ring"></div>
-            <el-icon class="loading-icon"><MagicStick /></el-icon>
-          </div>
-          <h3>AI 正在为你智能匹配...</h3>
-          <p>正在分析简历、检索岗位库、评估匹配度</p>
-          <div class="loading-steps">
-            <div v-for="(step, i) in loadingSteps" :key="i" :class="['step-item', { active: currentStep >= i }]">
-              <el-icon v-if="currentStep > i" class="step-done"><CircleCheck /></el-icon>
-              <div v-else-if="currentStep === i" class="step-spinner"></div>
-              <span v-else class="step-dot"></span>
-              <span class="step-text">{{ step }}</span>
-            </div>
-          </div>
-        </div>
+        <InteractiveLoading
+          title="智能匹配分析中"
+          description="正在融合多维数据，为你精准匹配最佳岗位"
+          statusText="AI 匹配引擎运行中"
+          :steps="loadingSteps"
+          :currentStep="currentStep"
+          :progress="progressPercent"
+          :showProgress="true"
+          :orbLabels="['前端', '后端', 'AI', '数据', '产品', '安全', '运维', '设计']"
+        />
       </div>
 
       <!-- 无数据状态 -->
@@ -108,6 +102,15 @@
                     </span>
                   </div>
                 </div>
+                <el-button
+                  :type="lockedIndex === idx ? 'primary' : 'default'"
+                  :icon="lockedIndex === idx ? Lock : Unlock"
+                  :loading="lockingIndex === idx"
+                  circle
+                  size="small"
+                  class="lock-btn"
+                  @click.stop="lockJob(idx)"
+                />
                 <div class="job-score">
                   <span class="score-value">{{ job.total_score }}</span>
                   <span class="score-label">分</span>
@@ -199,19 +202,22 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import {
   MagicStick, Connection, DataAnalysis, List, Location, Money,
-  ChatDotRound, Histogram, Warning, Aim, Link, CircleCheck,
-  Briefcase, OfficeBuilding
+  ChatDotRound, Histogram, Warning, Aim, Link,
+  Briefcase, OfficeBuilding, Lock, Unlock
 } from '@element-plus/icons-vue'
 import { matchingApi } from '@/api/matching'
-import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
+import { currentRadarData, dimensionDetailsRaw, matchVersion } from './profileState.js'
+import InteractiveLoading from '@/components/InteractiveLoading.vue'
 
 const router = useRouter()
+const hasMatchData = inject('hasMatchData', ref(false))
+const parentSelectedJob = inject('selectedJob', ref(null))
 
 // ==================== 缓存 ====================
 const CACHE_KEY = 'job_match_cache'
@@ -244,10 +250,14 @@ let radarInstance = null
 
 const loadingSteps = ['加载用户画像', 'RAG 检索匹配岗位', 'Neo4j 知识图谱增强', 'LLM 多维度评分', '生成匹配报告']
 const currentStep = ref(0)
+const progressPercent = ref(0)
 let stepTimer = null
+let progressTimer = null
 
 const hasData = computed(() => rankedResults.value.length > 0)
 const selectedJob = computed(() => rankedResults.value[selectedIndex.value] || {})
+const lockedIndex = ref(null)
+const lockingIndex = ref(null)
 
 const dimensionList = computed(() => {
   const scores = selectedJob.value.scores || {}
@@ -264,12 +274,23 @@ const startMatch = async () => {
   rankedResults.value = []
   selectedIndex.value = 0
   clearCache()
+  // 清除成长追踪缓存，触发重新加载
+  sessionStorage.removeItem('growth_tracker_cache')
+  matchVersion.value++
   currentStep.value = 0
+  progressPercent.value = 0
 
   // 模拟步骤进度
   stepTimer = setInterval(() => {
     if (currentStep.value < loadingSteps.length - 1) currentStep.value++
   }, 3000)
+
+  // 平滑进度条
+  progressTimer = setInterval(() => {
+    if (progressPercent.value < 90) {
+      progressPercent.value += Math.random() * 12
+    }
+  }, 400)
 
   try {
     // Build profile data from current frontend state
@@ -304,8 +325,11 @@ const startMatch = async () => {
 
     rankedResults.value = results
     selectedIndex.value = 0
+    lockedIndex.value = null
     currentStep.value = loadingSteps.length - 1
+    progressPercent.value = 100
     saveToCache(results, 0, hashProfile(currentRadarData.value))
+    hasMatchData.value = true
     ElMessage.success(`匹配完成，共找到 ${results.length} 个岗位`)
 
     await nextTick()
@@ -315,6 +339,7 @@ const startMatch = async () => {
     ElMessage.error('匹配请求失败，请稍后重试')
   } finally {
     clearInterval(stepTimer)
+    clearInterval(progressTimer)
     loading.value = false
   }
 }
@@ -326,6 +351,53 @@ const selectJob = (idx) => {
   const cached = loadFromCache()
   if (cached) saveToCache(cached.results, idx, cached.profileHash)
   nextTick(() => updateRadarChart())
+}
+
+// ==================== 锁定岗位 ====================
+const lockJob = async (idx) => {
+  if (lockedIndex.value === idx) {
+    // 取消锁定
+    lockedIndex.value = null
+    hasMatchData.value = false
+    parentSelectedJob.value = null
+    sessionStorage.removeItem('growth_tracker_cache')
+    ElMessage.info('已取消锁定')
+    return
+  }
+  lockingIndex.value = idx
+  try {
+    const job = rankedResults.value[idx]
+    // 先清除成长追踪缓存，确保切换岗位后重新获取数据
+    sessionStorage.removeItem('growth_tracker_cache')
+    await matchingApi.selectJob(job)
+    lockedIndex.value = idx
+    hasMatchData.value = true
+    parentSelectedJob.value = job
+    ElMessage.success(`已锁定「${job.job_title}」，学习计划已生成`)
+  } catch (err) {
+    console.error('[JobMatch] lock job failed:', err)
+    ElMessage.error('锁定失败，请重试')
+  } finally {
+    lockingIndex.value = null
+  }
+}
+
+// 恢复锁定状态
+const restoreLockState = async () => {
+  try {
+    const { data } = await matchingApi.getSelectedJob()
+    if (data.success && data.data) {
+      const saved = data.data
+      const idx = rankedResults.value.findIndex(
+        j => j.job_title === saved.job_title && j.company === saved.company
+      )
+      if (idx >= 0) {
+        lockedIndex.value = idx
+        hasMatchData.value = true
+        parentSelectedJob.value = rankedResults.value[idx]
+      }
+    }
+  } catch { /* ignore */ }
 }
 
 // ==================== 雷达图 ====================
@@ -477,12 +549,16 @@ onMounted(() => {
   if (cached && cached.results?.length && hashProfile(currentRadarData.value) === cached.profileHash) {
     rankedResults.value = cached.results
     selectedIndex.value = cached.index || 0
-    nextTick(() => requestAnimationFrame(() => initRadarChart()))
+    nextTick(() => {
+      requestAnimationFrame(() => initRadarChart())
+      restoreLockState()
+    })
   }
 })
 
 onUnmounted(() => {
   clearInterval(stepTimer)
+  clearInterval(progressTimer)
   radarInstance?.dispose()
   window.removeEventListener('resize', handleResize)
 })
@@ -511,10 +587,7 @@ watch(currentRadarData, (newVal, oldVal) => {
 <style scoped lang="scss">
 .job-match-container {
   padding: 10px;
-  background-color: #f6f8ff;
-  background-image:
-    radial-gradient(at 100% 100%, rgba(188, 216, 249, 0.2) 0px, transparent 50%),
-    radial-gradient(at 10% 0%, rgba(253, 253, 249, 0.6) 0px, transparent 40%);
+  background: transparent;
   min-height: calc(100vh - 60px);
   overflow-x: hidden;
 }
@@ -527,27 +600,28 @@ watch(currentRadarData, (newVal, oldVal) => {
 /* 玻璃卡片通用 */
 .glass-card {
   background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
   border-radius: 20px;
   padding: 24px;
-  border: 1px solid rgba(29, 48, 130, 0.08);
-  box-shadow: 0 8px 32px rgba(29, 48, 130, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
   margin-bottom: 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
 
   &:hover {
-    box-shadow: 0 12px 48px rgba(29, 48, 130, 0.06);
-    background: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.07);
+    background: rgba(255, 255, 255, 0.5);
   }
 
-  &.accent-blue .card-title .el-icon { color: #5098f9; }
+  &.accent-blue .card-title .el-icon { color: #667eea; }
   &.accent-green .card-title .el-icon { color: #6bd089; }
   &.accent-orange .card-title .el-icon { color: #e89e5a; }
 
   .card-title {
     margin: 0 0 20px 0;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 600;
     color: #1e293b;
     display: flex;
     align-items: center;
@@ -595,90 +669,11 @@ watch(currentRadarData, (newVal, oldVal) => {
   }
 }
 
-/* 加载状态 */
+/* 加载状态 - 使用 InteractiveLoading 组件 */
 .loading-section {
-  .loading-card {
-    text-align: center;
-    padding: 60px 24px;
-
-    .loading-animation {
-      position: relative;
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 24px;
-
-      .pulse-ring {
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        border: 3px solid rgba(80, 152, 249, 0.2);
-        animation: pulseRing 2s ease-out infinite;
-      }
-      .loading-icon {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 36px;
-        color: #5098f9;
-        animation: spinFloat 3s ease-in-out infinite;
-      }
-    }
-
-    h3 {
-      margin: 0 0 8px;
-      font-size: 18px;
-      color: #1e293b;
-    }
-    p {
-      margin: 0 0 32px;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-  }
-
-  .loading-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    max-width: 300px;
-    margin: 0 auto;
-    text-align: left;
-
-    .step-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      color: #94a3b8;
-      transition: all 0.3s;
-
-      &.active {
-        color: #5098f9;
-        font-weight: 600;
-      }
-
-      .step-done {
-        color: #6bd089;
-        font-size: 16px;
-      }
-      .step-spinner {
-        width: 16px;
-        height: 16px;
-        border: 2px solid rgba(80, 152, 249, 0.2);
-        border-top-color: #5098f9;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-      .step-dot {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #e2e8f0;
-      }
-    }
-  }
+  min-height: 70vh;
+  border-radius: 20px;
+  overflow: hidden;
 }
 
 /* 空状态 */
@@ -886,6 +881,11 @@ watch(currentRadarData, (newVal, oldVal) => {
           font-weight: 600;
         }
       }
+
+      .lock-btn {
+        flex-shrink: 0;
+        transition: all 0.2s;
+      }
     }
   }
 }
@@ -1032,16 +1032,6 @@ watch(currentRadarData, (newVal, oldVal) => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulseRing {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(1.6); opacity: 0; }
-}
-
-@keyframes spinFloat {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(180deg); }
 }
 
 @keyframes spin {

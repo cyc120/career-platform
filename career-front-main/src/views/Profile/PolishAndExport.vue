@@ -289,7 +289,7 @@ const handleDownload = async () => {
   padding: 20px;
   display: flex;
   justify-content: center;
-  background: #f4f7fa;
+  background: transparent;
 
   .main-layout {
     display: grid;
@@ -297,21 +297,24 @@ const handleDownload = async () => {
     gap: 20px;
     width: 100%;
     max-width: 1260px;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(20px) saturate(1.1);
+    -webkit-backdrop-filter: blur(20px) saturate(1.1);
     border-radius: 24px;
     padding: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
   }
 }
 
 .report-display-container {
-  background: #fff8e739;;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(16px);
   border-radius: 16px;
   padding: 40px 50px;
   overflow-y: auto;
-  border: 1px solid #eef2f6;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 
   .paper-header {
     margin-bottom: 25px;

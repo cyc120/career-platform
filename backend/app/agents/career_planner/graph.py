@@ -51,6 +51,7 @@ class CareerPlannerAgent(AgentBase):
         result = await graph.ainvoke({
             "user_id": input_data.get("user_id", 0),
             "user_profile": input_data.get("user_profile", {}),
+            "top_job": input_data.get("top_job", {}),
         })
 
         return {

@@ -7,6 +7,21 @@ from app.db.mysql import AsyncSessionLocal
 
 
 async def get_target_job(user_id: int) -> dict | None:
+    # 优先查询用户锁定的岗位
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            text("SELECT job_data FROM user_selected_job WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        row = result.fetchone()
+        if row:
+            try:
+                job = json.loads(row[0])
+                return {"job_name": job.get("job_title", ""), "match_score": job.get("total_score", 0)}
+            except Exception:
+                pass
+
+    # 回退到匹配报告中得分最高的岗位
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             text(
@@ -60,7 +75,18 @@ async def get_learning_plan(user_id: int) -> dict | None:
         return dict(row._mapping) if row else None
 
 
-async def save_daily_tasks(user_id: int, tasks: list[dict]) -> int:
+async def save_daily_tasks(user_id: int, tasks: list[dict], target_job: str = "") -> int:
+    if not tasks:
+        return 0
+
+    # 先删除该用户旧的任务
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM daily_tasks WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        await db.commit()
+
     count = 0
     async with AsyncSessionLocal() as db:
         for task in tasks:
@@ -75,7 +101,11 @@ async def save_daily_tasks(user_id: int, tasks: list[dict]) -> int:
                     "t": task.get("title", ""),
                     "d": task.get("description", ""),
                     "dur": task.get("duration", ""),
-                    "res": json.dumps(task.get("resources", []), ensure_ascii=False),
+                    "res": json.dumps({
+                        "difficulty": task.get("difficulty", "中等"),
+                        "target_job": target_job,
+                        "resources": task.get("resources", []),
+                    }, ensure_ascii=False),
                 },
             )
             count += 1
@@ -87,12 +117,22 @@ async def get_daily_tasks(user_id: int) -> list[dict]:
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             text(
-                "SELECT id, task_date, title, description, duration, status "
+                "SELECT id, task_date, title, description, duration, resources, status "
                 "FROM daily_tasks WHERE user_id = :uid ORDER BY task_date, id"
             ),
             {"uid": user_id},
         )
-        return [dict(r._mapping) for r in result.fetchall()]
+        rows = [dict(r._mapping) for r in result.fetchall()]
+        # 解析 resources 字段提取 difficulty 和 target_job
+        for row in rows:
+            try:
+                res = json.loads(row.get("resources", "{}"))
+                row["difficulty"] = res.get("difficulty", "中等")
+                row["target_job"] = res.get("target_job", "")
+            except Exception:
+                row["difficulty"] = "中等"
+                row["target_job"] = ""
+        return rows
 
 
 async def update_task_status(task_id: int, status: str) -> bool:

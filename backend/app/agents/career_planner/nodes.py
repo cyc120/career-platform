@@ -17,6 +17,10 @@ from app.agents.career_planner import tools
 
 
 async def get_top_job(state: CareerPlannerState) -> Dict:
+    # 优先使用传入的 top_job（来自 job_matcher 推送）
+    if state.get("top_job"):
+        return {"top_job": state["top_job"]}
+    # 否则从数据库查询
     uid = state["user_id"]
     top = await tools.get_top_matched_job(uid)
     return {"top_job": top or {}}

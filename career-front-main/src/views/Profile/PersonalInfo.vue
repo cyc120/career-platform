@@ -514,22 +514,23 @@ const initWordCloud = () => {
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.45) !important;
-  backdrop-filter: blur(15px);
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
   border-radius: 20px;
-  /* 🌟 边框改为淡蓝色 */
-  border: 1px solid rgba(112, 161, 255, 0.15) !important;
-  box-shadow: 0 8px 32px rgba(112, 161, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
   height: 100%;
   transition: all 0.3s ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.55) !important;
-    border-color: rgba(112, 161, 255, 0.3) !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.07);
   }
 
   :deep(.el-card__header) {
-    border-bottom: 1px solid rgba(112, 161, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 

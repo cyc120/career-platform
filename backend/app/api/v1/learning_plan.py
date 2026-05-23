@@ -50,6 +50,7 @@ class PolishRequest(BaseModel):
 
 class DailyTasksRequest(BaseModel):
     phase_index: int = 0
+    force_refresh: bool = False
 
 
 class AdjustRequest(BaseModel):
@@ -89,7 +90,10 @@ async def parse_file(req: ParseFileRequest, user: dict = Depends(get_current_use
         try:
             import pdfplumber
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                pages = [page.extract_text() or '' for page in pdf.pages]
+                # 简历通常只需前5页，跳过后续页面加快解析
+                pages = []
+                for i, page in enumerate(pdf.pages[:5]):
+                    pages.append(page.extract_text() or '')
             return {"success": True, "text": "\n".join(pages)}
         except ImportError:
             raise HTTPException(500, "pdfplumber not installed")
@@ -104,12 +108,66 @@ async def parse_file(req: ParseFileRequest, user: dict = Depends(get_current_use
 
 @router.post("/generate")
 async def generate_plan(req: GenerateRequest, user: dict = Depends(get_current_user)):
-    result = await harness.run(
-        "learning_plan",
-        {"user_id": user["user_id"], "action": "generate", "plan_type": req.plan_type},
-        user_id=user["user_id"],
-    )
-    return result
+    from app.agents.job_matcher.db_utils import get_selected_job
+    from app.agents.learning_plan import prompts as lp_prompts
+
+    uid = user["user_id"]
+    selected = await get_selected_job(uid)
+    target_job = selected.get("job_title", "") if selected else ""
+
+    # 优先从数据库读取已保存的计划
+    existing = await tools.get_learning_plan(uid)
+    existing_job = existing.get("target_job", "") if existing else ""
+
+    if existing and existing.get("phases") and (not target_job or existing_job == target_job):
+        phases = existing["phases"]
+        if isinstance(phases, str):
+            try:
+                phases = json.loads(phases)
+            except Exception:
+                phases = []
+        return {
+            "success": True,
+            "learning_plan": {
+                "target_job": existing.get("target_job", ""),
+                "plan_type": existing.get("plan_type", "长期"),
+                "phases": phases,
+            },
+        }
+
+    # 直接调 LLM 生成
+    llm = get_llm(temperature=0.7)
+    msg = await llm.ainvoke([
+        SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
+        HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
+            current_skills="", target_job=target_job,
+            resources="[]", plan_type=req.plan_type,
+        )),
+    ])
+    try:
+        raw = msg.content.strip()
+        for marker in ("```json", "```"):
+            if marker in raw:
+                raw = raw.split(marker)[1].split("```")[0]
+                break
+        plan = json.loads(raw.strip())
+    except Exception:
+        plan = {"phases": []}
+
+    if plan.get("phases"):
+        await tools.save_learning_plan(uid, target_job, req.plan_type, plan["phases"])
+
+    if not plan or not plan.get("phases"):
+        if existing and existing.get("phases"):
+            phases = existing["phases"]
+            if isinstance(phases, str):
+                try:
+                    phases = json.loads(phases)
+                except Exception:
+                    phases = []
+            plan = {"target_job": existing_job, "plan_type": "长期", "phases": phases}
+
+    return {"success": True, "learning_plan": plan}
 
 
 @router.post("/polish")
@@ -124,12 +182,118 @@ async def polish_plan(req: PolishRequest, user: dict = Depends(get_current_user)
 
 @router.post("/daily-tasks")
 async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_current_user)):
-    result = await harness.run(
-        "learning_plan",
-        {"user_id": user["user_id"], "action": "daily_tasks", "phase_index": req.phase_index},
-        user_id=user["user_id"],
-    )
-    return result
+    from app.agents.job_matcher.db_utils import get_selected_job
+    from app.agents.learning_plan import prompts as lp_prompts
+    import json as _json
+
+    uid = user["user_id"]
+    selected = await get_selected_job(uid)
+    target_job = selected.get("job_title", "") if selected else ""
+    print(f"[API] daily-tasks user_id={uid}, target_job='{target_job}', selected={selected is not None}")
+
+    # 1. 检查已有任务是否匹配当前锁定岗位
+    existing_tasks = await tools.get_daily_tasks(uid)
+    if existing_tasks and not req.force_refresh:
+        task_target = existing_tasks[0].get("target_job", "") if existing_tasks else ""
+        print(f"[API] daily-tasks: existing tasks target='{task_target}', count={len(existing_tasks)}")
+        if target_job and task_target == target_job:
+            print(f"[API] daily-tasks returning cached tasks for '{target_job}'")
+            return {"success": True, "daily_tasks": existing_tasks, "target_job": target_job, "cached": True}
+        print(f"[API] daily-tasks: target mismatch (task='{task_target}' vs job='{target_job}'), regenerating")
+
+    # 2. 从 DB 读取学习计划
+    plan = await tools.get_learning_plan(uid)
+    plan_job = plan.get("target_job", "") if plan else ""
+    print(f"[API] daily-tasks: plan from DB target_job='{plan_job}', has_phases={bool(plan and plan.get('phases'))}")
+
+    # 3. 计划不存在或目标岗位不匹配 → 直接调 LLM 生成计划
+    if not plan or not plan.get("phases") or (target_job and plan_job != target_job):
+        print(f"[API] daily-tasks: generating plan for '{target_job}' via LLM...")
+        llm = get_llm(temperature=0.7)
+        msg = await llm.ainvoke([
+            SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
+            HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
+                current_skills="", target_job=target_job,
+                resources="[]", plan_type="长期",
+            )),
+        ])
+        try:
+            raw = msg.content.strip()
+            for marker in ("```json", "```"):
+                if marker in raw:
+                    raw = raw.split(marker)[1].split("```")[0]
+                    break
+            plan_data = _json.loads(raw.strip())
+        except Exception as e:
+            print(f"[API] daily-tasks: plan LLM parse error: {e}")
+            plan_data = {"phases": []}
+
+        phases_list = plan_data.get("phases", [])
+        if phases_list:
+            await tools.save_learning_plan(uid, target_job, "长期", phases_list)
+            plan = {"target_job": target_job, "phases": phases_list}
+            print(f"[API] daily-tasks: plan saved with {len(phases_list)} phases for '{target_job}'")
+        else:
+            return {"success": False, "daily_tasks": [], "target_job": target_job, "error": "学习计划生成失败"}
+
+    # 4. 提取 phases
+    phases = plan.get("phases", [])
+    if isinstance(phases, str):
+        try:
+            phases = _json.loads(phases)
+        except Exception:
+            pass
+
+    if not phases:
+        return {"success": False, "daily_tasks": [], "target_job": target_job, "error": "学习计划阶段为空"}
+
+    # 5. 取第一个阶段，直接调 LLM 生成任务
+    phase = phases[req.phase_index] if req.phase_index < len(phases) else phases[0]
+    phase_str = _json.dumps(phase, ensure_ascii=False)
+
+    tasks = []
+    llm = get_llm(temperature=0.4)
+    for attempt in range(2):
+        try:
+            msg = await llm.ainvoke([
+                SystemMessage(content=lp_prompts.DAILY_TASK_SYSTEM),
+                HumanMessage(content=lp_prompts.DAILY_TASK_USER.format(
+                    target_job=target_job, phase=phase_str,
+                )),
+            ])
+            raw = msg.content.strip()
+            # 提取 JSON
+            for marker in ("```json", "```"):
+                if marker in raw:
+                    raw = raw.split(marker)[1].split("```")[0]
+                    break
+            parsed = _json.loads(raw.strip())
+            if isinstance(parsed, dict):
+                parsed = parsed.get("tasks", parsed.get("daily_tasks", []))
+            if isinstance(parsed, list) and len(parsed) > 0:
+                tasks = parsed
+                break
+        except Exception as e:
+            print(f"[API] daily-tasks LLM attempt {attempt+1} error: {e}")
+
+    # 6. 标准化并保存
+    normalized = []
+    for i, t in enumerate(tasks):
+        if isinstance(t, str):
+            normalized.append({"title": t, "description": t, "duration": "30min", "difficulty": "中等"})
+        elif isinstance(t, dict):
+            normalized.append({
+                "title": t.get("title", t.get("content", f"任务{i+1}")),
+                "description": t.get("description", t.get("desc", "")),
+                "duration": t.get("duration", t.get("time", "30min")),
+                "difficulty": t.get("difficulty", "中等"),
+            })
+
+    if normalized:
+        await tools.save_daily_tasks(uid, normalized, target_job)
+        print(f"[API] daily-tasks saved {len(normalized)} tasks for '{target_job}'")
+
+    return {"success": True, "daily_tasks": normalized, "target_job": target_job}
 
 
 @router.post("/adjust")
