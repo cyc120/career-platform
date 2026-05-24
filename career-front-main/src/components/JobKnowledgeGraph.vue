@@ -128,6 +128,7 @@ const initGraph = async () => {
           ctx.fillText(label, node.x, node.y)
         }
       })
+      .nodeLabel((node) => `<div style="background:rgba(0,0,0,0.75);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;max-width:320px;white-space:pre-wrap;word-break:break-all;">${node.fullName || node.name}</div>`)
       .linkDirectionalArrowLength(3)
       .linkDirectionalArrowRelPos(1)
       .d3Force('charge', d3.forceManyBody().strength(-2500))
@@ -231,6 +232,6 @@ onBeforeUnmount(() => {
   right: 15px;
   bottom: 15px;
   z-index: 10;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(89, 89, 89, 0.1);
 }
 </style>

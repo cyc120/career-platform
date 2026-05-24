@@ -137,6 +137,7 @@
               <el-icon><Histogram /></el-icon>
               七维度匹配详情
             </h3>
+            <img src="@/assets/3D grow.png" class="dim-decoration" />
             <div class="dimensions-grid">
               <div
                 v-for="(dim, idx) in dimensionList"
@@ -910,6 +911,22 @@ watch(currentRadarData, (newVal, oldVal) => {
 }
 
 .dimensions-card {
+  position: relative;
+  overflow: hidden;
+
+  .dim-decoration {
+    position: absolute;
+    bottom: -50px;
+    right: -50px;
+    width: 800px;
+    height: 300px;
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: 0;
+    -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 75%);
+    mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 75%);
+  }
+
   .dimensions-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

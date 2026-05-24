@@ -501,9 +501,9 @@ const handleExport = async (format) => {
 }
 
 .generate-btn {
-  background: linear-gradient(135deg, #70a1ff 0%, #5b8def 100%) !important;
+  background: linear-gradient(135deg, #9acaf679 0%, #f9ceee80 100%) !important;
   border: none !important;
-  color: #fff !important;
+  color: #1c3c74 !important;
   width: 100% !important;
   max-width: 320px;
   height: 48px !important;

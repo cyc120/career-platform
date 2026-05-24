@@ -581,7 +581,7 @@ const completionLabel = computed(() => {
 .sidebar {
   width: 240px;
   height: 100vh;
-  background: linear-gradient(180deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.06) 50%, rgba(255, 255, 255, 0.3) 100%);
+  background: linear-gradient(180deg, rgba(249, 249, 249, 0.445) 0%, rgba(218, 234, 251, 0.586) 50%, rgba(255, 255, 255, 0.3) 100%);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border-right: 1px solid rgba(255, 255, 255, 0.4);
@@ -589,7 +589,7 @@ const completionLabel = computed(() => {
   flex-direction: column;
   transition: all 0.3s ease;
   z-index: 100;
-  box-shadow: 4px 0 20px rgba(102, 126, 234, 0.06);
+  box-shadow: 4px 0 20px rgba(253, 252, 179, 0.06);
 
   .avatar-placeholder {
     padding: 40px 0 28px;
@@ -632,7 +632,7 @@ const completionLabel = computed(() => {
         top: 0;
         width: 3px;
         height: 100%;
-        background: linear-gradient(180deg, #667eea, #764ba2);
+        background: linear-gradient(180deg, #8eb6f1, #fbd7f3);
         border-radius: 0 4px 4px 0;
         opacity: 0;
         transition: opacity 0.25s ease;
@@ -651,8 +651,8 @@ const completionLabel = computed(() => {
 
       /* 鼠标悬停 */
       &:hover {
-        background: rgba(102, 126, 234, 0.1) !important;
-        color: #4f46e5;
+        background: rgba(185, 224, 249, 0.219) !important;
+        color: #1b4374;
 
         :deep(.el-icon) {
           color: #667eea;
@@ -661,8 +661,8 @@ const completionLabel = computed(() => {
 
       /* 激活状态 */
       &.is-active {
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
-        color: #4f46e5 !important;
+        background: linear-gradient(135deg, rgba(168, 214, 247, 0.301) 0%, rgba(242, 244, 246, 0.455) 100%) !important;
+        color: #0d284e !important;
         font-weight: 600;
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
 
@@ -842,9 +842,9 @@ const completionLabel = computed(() => {
     right: 0;
     bottom: 0;
     background:
-      radial-gradient(circle at 20% 30%, rgba(102, 126, 234, 0.06) 0%, transparent 40%),
-      radial-gradient(circle at 80% 70%, rgba(118, 75, 162, 0.05) 0%, transparent 40%),
-      radial-gradient(circle at 50% 50%, rgba(64, 158, 255, 0.03) 0%, transparent 50%);
+      radial-gradient(circle at 20% 30%, rgba(247, 247, 202, 0.49) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(169, 219, 241, 0.394) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(236, 180, 236, 0.192) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
@@ -937,9 +937,9 @@ const completionLabel = computed(() => {
   padding: 10px 0;
 
 .analyze-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, #fffff9 0%, #fef7fc 100%) !important;
   border: none !important;
-  color: #fff !important;
+  color: #1f477b !important;
   box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   border-radius: 14px;
@@ -1008,8 +1008,8 @@ const completionLabel = computed(() => {
       flex-direction: row-reverse;
       align-self: flex-end;
       .message-bubble {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: linear-gradient(135deg, #abd9ff 0%, #f1d3fb 100%);
+        color: rgb(19, 46, 86);
         border-radius: 16px 16px 4px 16px;
         box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
       }
@@ -1122,8 +1122,8 @@ const completionLabel = computed(() => {
     width: 40px;
     height: 40px;
     border: none;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
+    background: linear-gradient(135deg, #93cff9 0%, #fbd2ee 100%);
+    box-shadow: 0 6px 16px rgba(102, 175, 234, 0.35);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {
