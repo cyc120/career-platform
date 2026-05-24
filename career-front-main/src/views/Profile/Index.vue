@@ -346,10 +346,38 @@ const GREETING_TEXT = `你好！我是你的职能助手 👋
 
 直接回复即可，我会根据你的信息生成专属画像分析。`
 
-const initChatGreeting = () => {
+const initChatGreeting = async () => {
   if (chatGreeted.value) return
-  chatGreeted.value = true
-  chatMessages.value.push({ id: Date.now(), role: 'assistant', content: GREETING_TEXT })
+  loading.value = true
+  try {
+    console.log('[Coach] Sending greeting request...')
+    const resp = await learningPlanApi.coach(
+      '新用户首次对话。用一句话打招呼，然后问：什么学校、什么方向（前端/后端/算法/AI等）、大几。', []
+    )
+    console.log('[Coach] Response:', resp.data)
+    const reply = resp.data?.reply
+    if (reply) {
+      chatMessages.value.push({ id: Date.now(), role: 'assistant', content: reply })
+      chatGreeted.value = true
+    } else {
+      console.warn('[Coach] No reply in response:', resp.data)
+      chatMessages.value.push({ id: Date.now(), role: 'assistant', content: '你好！我是职途无限AI教练，请问你是哪个学校的？学的什么方向？' })
+      chatGreeted.value = true
+    }
+    if (resp.data?.radar_data) {
+      currentRadarData.value = resp.data.radar_data
+    }
+    if (resp.data?.dimension_details && Object.keys(resp.data.dimension_details).length > 0) {
+      dimensionDetailsRaw.value = resp.data.dimension_details
+      currentStepIndex.value = 2
+    }
+  } catch (err) {
+    console.error('[Coach] Greeting failed:', err)
+    chatMessages.value.push({ id: Date.now(), role: 'assistant', content: '你好！我是职途无限AI教练，请问你是哪个学校的？学的什么方向？' })
+    chatGreeted.value = true
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {

@@ -617,6 +617,7 @@ watch(currentRadarData, (newVal, oldVal) => {
   &.accent-blue .card-title .el-icon { color: #667eea; }
   &.accent-green .card-title .el-icon { color: #6bd089; }
   &.accent-orange .card-title .el-icon { color: #e89e5a; }
+  &.accent-purple .card-title .el-icon { color: #945fb9; }
 
   .card-title {
     margin: 0 0 20px 0;

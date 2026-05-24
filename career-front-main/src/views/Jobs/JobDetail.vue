@@ -60,10 +60,7 @@
         <template #header>
           <span>岗位要求画像</span>
         </template>
-        <div class="graph-wrapper">
-          <div ref="graphContainer" class="graph-canvas"></div>
-          <el-button class="reset-btn" @click="resetView" circle icon="Refresh" />
-        </div>
+        <JobKnowledgeGraph :job-title="job?.title" :key="job?.title" />
       </el-card>
 
       <el-card class="card promotion-card">
@@ -82,229 +79,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Star, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { jobsApi } from '@/api/jobs'
 import { favoritesApi } from '@/api/favorites'
-import ForceGraph from 'force-graph'
-import neo4j from 'neo4j-driver'
-import * as d3 from 'd3';
-import * as G6 from '@antv/g6';
 import PromotionGraph from '@/components/PromotionGraph.vue'
-// --- 1. 引用和状态 ---
-const graphContainer = ref(null)
-let graphInstance = null
-
-// --- 2. Neo4j 连接配置 ---
-// 这里等同学发地址后，替换成 'bolt://xxx.cpolar.top:xxx'
-const NEO4J_URL = 'bolt://localhost:7687' 
-const driver = neo4j.driver(NEO4J_URL, neo4j.auth.basic('', ''))
-
-const NODE_CONFIG = {
-  Job: { color: '#6fb1fc', size: 10 },        // 中心岗位：蓝色，最大
-  Skill: { color: '#f79767', size: 7 },      // 技能：橙色，中等
-  Requirement: { color: '#57c7e3', size: 6 }, // 要求：青色
-  Default: { color: '#d3d3d3', size: 5 }      // 其他：灰色
-};
-
-// --- 3. 初始化图谱函数 ---
-const initGraph = async () => {
-
-  // JobDetail.vue 约 160 行 initGraph 函数内
-const LEVEL_COLORS = {
-  1: '#FF8C00', // 第一级：深橙色，突出中心岗位
-  2: '#E6E6FA', // 第二级：深天蓝色，与第一级有明显色差
-};
-
-// 第三级：随机彩色池（淡雅色系，保证文字清晰）
-const THIRD_LEVEL_COLORS = ['#7fb8ee', '#76d7ea', '#8de3c0', '#b6e39a', '#f3d999', '#f7a8a8'];  if (!graphContainer.value || !job.value) return;
-
-  const nameMap = {
-    "软件测试": "软件测试工程师（专项方向）",
-    "C/C++": "C++",
-    "前端开发": "前端开发工程师",
-    "Java": "Java开发工程师", 
-    "硬件测试": "硬件测试工程师",
-    "测试工程师": "测试工程师（软件方向）",
-    // 你可以根据需要继续在这里添加剩下的岗位映射
-  };
-
-  // 2. 获取最终用于查询的字符串
-  // 如果在 map 里找到了就用映射后的，没找到就直接用原标题
-  const searchTitle = nameMap[job.value.title] || job.value.title;
-
-  if (graphInstance) graphInstance._destructor();
-
-  // 2. 初始化实例（不依赖外部 d3 变量）
-graphInstance = ForceGraph()(graphContainer.value)
-.backgroundColor('rgba(0,0,0,0)')
-.nodeCanvasObject((node, ctx, globalScale) => {
-  const label = node.name;
-  
-  // 💡 第一步：修正半径逻辑，手动覆盖 node.val
-  let currentRadius;
-  if (node.level === 1) {
-    currentRadius = 24; // 显著放大核心球
-  } else if (node.level === 2) {
-    currentRadius = 18; // 中等放大分类球
-  } else {
-    // 第三层保留原有的 val 或者根据字数自适应
-    currentRadius = node.val || 10; 
-  }
-
-  // 1. 绘制圆形背景
-  ctx.beginPath();
-// 💡 这里直接根据 level 判断，强制给 1、2 层大半径，其他用原来的 node.val
-  ctx.arc(node.x, node.y, node.level == 1 ? 70 : (node.level === 2 ? 45 : node.val), 0, 2 * Math.PI, false);  
-  // 为第一二层增加呼吸发光感（可选，增加突出度）
-  if (node.level <= 2) {
-    ctx.shadowColor = node.color;
-    ctx.shadowBlur = 10 / globalScale;
-  }
-  
-  ctx.fillStyle = node.color;
-  ctx.fill();
-  
-  // 恢复阴影并画白边
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.5 / globalScale;
-  ctx.stroke();
-
-// 2. 文字配置 - 随球体大小动态调整字号
-// 💡 修改点：第一层 18px (中心)，第二层 14px (分类)，第三层 11px (细分)
-const fontSize = node.level === 1 ? 18 : (node.level === 2 ? 14 : 11);
-
-// 保持粗细逻辑：第一二层加粗(600)，第三层正常(500)
-ctx.font = `${node.level <= 2 ? '600' : '500'} ${fontSize}px Sans-Serif`;
-
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-
-// 💡 建议：中心球文字颜色设为白色，增强对比度
-ctx.fillStyle = node.level === 1 ? '#ffffff' : '#001f3f';
-  
-  // 第一层核心球建议用白色字，对比更强烈
-  ctx.fillStyle = node.level === 1 ? '#ffffff' : '#001f3f';
-
-  // 3. 💡 智能换行逻辑 (偏移量改用动态的 fontSize)
-  if (label.length > 6) { 
-    const mid = Math.ceil(label.length / 2);
-    const line1 = label.substring(0, mid);
-    const line2 = label.substring(mid);
-    
-    // 这里的 0.6 是根据字号动态计算行高，保证在球体正中心
-    ctx.fillText(line1, node.x, node.y - fontSize * 0.6);
-    ctx.fillText(line2, node.x, node.y + fontSize * 0.6);
-  } else {
-    ctx.fillText(label, node.x, node.y);
-  }
-})
-    .linkDirectionalArrowLength(3)
-    .linkDirectionalArrowRelPos(1)
-    // .linkColor(() => '#E4E7ED');
-    .d3Force('charge', d3.forceManyBody().strength(-2500))  // 💡 减弱排斥力（从 -1000 改为 -300），让节点聚拢
-    .d3Force('link', d3.forceLink().distance(d => 120 + d.source.val + d.target.val))
-    .d3Force('collide', d3.forceCollide(node => node.val + 15)) // 💡 防止球体重叠
-    .d3Force('center', d3.forceCenter(0, 0))             // 💡 增加中心引力，确保整体在原点附近
-    .d3VelocityDecay(0.2)
-    
-
-  try {
-    const session = driver.session();
-    // 使用模糊匹配，增加查询范围
-    const cypher = `
-      MATCH (j:Job)-[r*1..2]-(m) 
-      WHERE j.title = $jobTitle OR j.name CONTAINS $jobTitle
-      RETURN j,r,m LIMIT 300
-    `;
-    const result = await session.run(cypher, { jobTitle: searchTitle });
-
-    const nodes = [];
-    const links = [];
-
-    result.records.forEach(record => {
-      ['j', 'm'].forEach(key => {
-        const node = record.get(key);
-        if (!node) return;
-
-        const id = node.identity.toString();
-        if (!nodes.find(n => n.id === id)) {
-          const label = node.labels[0] || 'Default';
-      const labelText = node.properties.title || node.properties.name || label;
-      // 💡 判断是否为中心岗位
-      const isCenterNode = (node.properties.title === job.value.title || node.properties.name === job.value.title);
-      const config = NODE_CONFIG[label] || NODE_CONFIG.Default;
-
-      // 💡 动态计算半径：保证球体能装下文字
-      const charCount = labelText.length;
-      const dynamicRadius = isCenterNode 
-        ? Math.max(20, charCount * 5.5) 
-        : Math.max(12, charCount * 4.5);
-
-      // 💡 确定层级 (Level)
-      let level = 3; 
-      if (isCenterNode) {
-        level = 1;
-      } else if (node.labels.includes('Ability')) { 
-        // 假设你的 Neo4j 中第二级节点带有 'Ability' 标签，如果没有，可以根据关系距离判断
-        level = 2;
-      }
-
-      // 💡 分配颜色
-      let finalColor;
-      if (level === 1) {
-        finalColor = LEVEL_COLORS[1];
-      } else if (level === 2) {
-        finalColor = LEVEL_COLORS[2];
-      } else {
-        // 第三层：根据 ID 取模随机分配彩色
-        finalColor = THIRD_LEVEL_COLORS[parseInt(id) % THIRD_LEVEL_COLORS.length];
-      }
-
-      // ✅ 确保这里只有一个干净的 nodes.push，没有重复的 fx/fy
-      nodes.push({
-        id: id,
-        name: labelText,
-        color: finalColor,
-        val: dynamicRadius, 
-        level: level,
-        fx: null,
-        fy: null
-          });
-        }
-      });
-
-      // 解析关系连线（保持不变）
-      const rel = record.get('r');
-      if (rel) {
-        if (Array.isArray(rel)) {
-          rel.forEach(r => links.push({ source: r.start.toString(), target: r.end.toString() }));
-        } else {
-          links.push({ source: rel.start.toString(), target: rel.end.toString() });
-        }
-      }
-    });
-
-    if (nodes.length > 0) {
-      graphInstance.graphData({ nodes, links });
-      
-      // 💡 视觉聚焦：在数据加载后强制相机对焦
-      setTimeout(() => {
-        graphInstance.centerAt(0, 0, 500); // 移动到原点
-        graphInstance.zoom(0.5, 500);        // 放大到 3 倍，解决“太小”的问题
-      }, 500);
-    } else {
-      console.warn("未查找到数据，查询词为:", job.value.title);
-    }
-
-    session.close();
-  } catch (err) {
-    console.error('Neo4j 连通或查询失败:', err);
-  }
-};
+import JobKnowledgeGraph from '@/components/JobKnowledgeGraph.vue'
 
 const loading = ref(true)
 const job = ref(null)
@@ -313,9 +95,7 @@ const route = useRoute()
 const isFavorited = ref(false)
 const jobId = computed(() => route.params.id)
 
-// 在页面挂载后启动
 onMounted(async () => {
-  // Load job from API
   const targetId = parseInt(route.params.id)
   try {
     const { data } = await jobsApi.detail(targetId)
@@ -334,7 +114,6 @@ onMounted(async () => {
     // Job not found — keep null
   }
 
-  // Check favorite status
   try {
     const { data: favData } = await favoritesApi.list()
     const favIds = (favData.favorites || []).map((f) => f.job_id)
@@ -344,24 +123,15 @@ onMounted(async () => {
   }
 
   loading.value = false
-
-  await nextTick()
-  initGraph()
 })
 
-// 返回上一页
-const goBack = () => {
-  router.back()
-}
+const goBack = () => router.back()
 
 const formatDescription = (desc) => {
   if (!desc) return ''
   return desc.replace(/；/g, '\n').replace(/\\n/g, '\n')
 }
 
-
-
-// 2. 修改点击收藏的逻辑
 const toggleFavorite = async () => {
   if (!job.value) return
   const id = parseInt(jobId.value)
@@ -379,108 +149,6 @@ const toggleFavorite = async () => {
     ElMessage.error('操作失败')
   }
 }
-
-// 1. 在脚本最顶部增加导入 (约第 34 行 import 区域)
-
-
-// 2. 在 toggleFavorite 函数下方追加以下绘图逻辑
-const graph = ref(null);
-const currentJobTitle = ref('软件测试工程师（专项方向）'); // 这里可以根据 job.value.title 动态匹配
-
-
-
-const promotionGraphInstance = ref(null);
-
-const initPromotionGraph = () => {
-  const container = document.getElementById('promotion-graph-container');
-  if (!container || !job.value) return;
-
-  // 1. 销毁旧实例，防止重复渲染
-  if (promotionGraphInstance.value) {
-    promotionGraphInstance.value.destroy();
-    promotionGraphInstance.value = null;
-  }
-
-  // 2. 统一获取岗位名称
-  const currentTitle = (job.value.job_title || job.value.title || "").trim();
-  
-  // 3. 过滤数据
-  const filtered = promotionData.filter(item => 
-    item.tech_type === currentTitle
-  );
-
-  // 调试：请在浏览器控制台查看这里是否有数据输出
-  console.log('当前页面岗位:', currentTitle);
-  console.log('匹配到的晋升路径数据:', filtered);
-
-  if (filtered.length === 0) {
-    console.warn(`未匹配到 "${currentTitle}" 的晋升数据，请检查 JSON 里的 tech_type`);
-    return;
-  }
-
-  // 4. 处理节点坐标 (将 fx, fy 映射到 G6 的 x, y)
-  const nodes = filtered.map(item => ({
-    id: item.title,
-    label: `${item.level}\n${item.title}`,
-    // 使用相对坐标，配合下面的 fitView: true 自动居中
-    x: item.fx, 
-    y: item.fy, 
-    type: 'modelRect',
-    style: {
-      fill: item.type === 'management' ? '#FDF6EC' : '#ffffff',
-      stroke: item.type === 'management' ? '#E6A23C' : '#409EFF',
-      lineWidth: 2,
-      radius: 4,
-    },
-    labelCfg: {
-      style: {
-        fontSize: 10,
-        fill: '#333'
-      }
-    }
-  }));
-
-  // 5. 生成连线 (根据 fy 排序连线)
-  const edges = [];
-  const sortedNodes = [...nodes].sort((a, b) => a.y - b.y);
-  for (let i = 0; i < sortedNodes.length - 1; i++) {
-    edges.push({
-      source: sortedNodes[i].id,
-      target: sortedNodes[i+1].id,
-      style: { stroke: '#A2B1C3', endArrow: true }
-    });
-  }
-
-  // 6. 初始化并渲染图谱
-  promotionGraphInstance.value = new G6.Graph({
-    container: 'promotion-graph-container',
-    width: container.scrollWidth,
-    height: 450,
-    fitView: true, // 核心：自动缩放以适配 fy 很大的数值
-    fitViewPadding: 30,
-    modes: {
-      default: ['drag-canvas', 'zoom-canvas', 'drag-node'],
-    },
-    defaultNode: {
-      size: [120, 40],
-    }
-  });
-
-  promotionGraphInstance.value.data({ nodes, edges });
-  promotionGraphInstance.value.render();
-};
-
-
-onBeforeUnmount(() => {
-  // 清理 Neo4j 实例
-  if (graphInstance && typeof graphInstance._destructor === 'function') {
-    graphInstance._destructor();
-  }
-  // 清理 G6 实例
-  if (promotionGraphInstance.value) {
-    promotionGraphInstance.value.destroy();
-  }
-});
 </script>
 
 <style scoped lang="scss">
@@ -999,38 +667,6 @@ onBeforeUnmount(() => {
   }
 }
 
-
-.graph-wrapper {
-  position: relative;
-  width: 100%;
-  height: 600px; /* 设定固定高度 */
-  background: #fdfdfd;
-  border-radius: 8px;
-  border: 1px solid #f0f2f5;
-  overflow: hidden;
-}
-
-.graph-canvas {
-  width: 100%;
-  height: 600px; /* 必须有明确高度，否则背景看不见 */
-  /* 设置径向渐变，营造空间感 */
-  background: radial-gradient(circle at center, #fefcce2d 0%, #e9f2fc99 100%) !important;
-  position: relative;
-  overflow: hidden;
-}
-
-/* 确保内部生成的 canvas 是透明的，否则会挡住上面的渐变 */
-:deep(.graph-canvas canvas) {
-  background-color: transparent !important;
-}
-
-.reset-btn {
-  position: absolute;
-  right: 15px;
-  bottom: 15px;
-  z-index: 10;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-}
 
 /* 兼容 Element Plus 卡片内部间距 */
 :deep(.el-card__body) {

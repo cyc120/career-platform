@@ -16,4 +16,7 @@ export const matchingApi = {
   getCapabilityModel() {
     return api.get('/matching/capability-model')
   },
+  getJobGraph(jobTitle) {
+    return api.get('/matching/job-graph', { params: { job_title: jobTitle } })
+  },
 }

@@ -19,6 +19,9 @@ router = APIRouter()
 async def get_guest_token():
     """Return a guest JWT token for development/testing without DB."""
     access_token = create_access_token(1)
+    # Store guest refresh token so /refresh works for guest users
+    r = await get_redis()
+    await store_refresh_token(1, "guest", 30)
     return TokenResponse(
         access_token=access_token,
         refresh_token="guest",

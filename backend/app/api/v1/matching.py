@@ -1,4 +1,5 @@
 import asyncio
+import re as _re
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -6,6 +7,7 @@ from sqlalchemy import text
 from app.agents.harness import harness
 from app.agents.job_matcher.db_utils import save_selected_job, get_selected_job
 from app.db.mysql import AsyncSessionLocal
+from app.db.neo4j import neo4j_manager
 from app.middleware.auth import get_current_user
 
 router = APIRouter()
@@ -139,9 +141,6 @@ async def has_matching(user: dict = Depends(get_current_user)):
     return {"success": True, "has_data": row is not None}
 
 
-import re as _re
-
-
 @router.get("/capability-model")
 async def get_capability_model(user: dict = Depends(get_current_user)):
     """Get capability model data for radar chart from the selected job's matching scores."""
@@ -200,3 +199,103 @@ async def get_capability_model(user: dict = Depends(get_current_user)):
             "job_title": job.get("job_title", ""),
         },
     }
+
+
+# ==================== 岗位知识图谱 ====================
+
+# 前端岗位名称 → Neo4j 中心节点名称映射
+JOB_NAME_MAP = {
+    "软件测试": "软件测试工程师（专项方向）",
+    "C/C++": "C/C++开发工程师",
+    "前端开发": "前端开发工程师",
+    "Java": "Java开发工程师",
+    "Java后端开发": "Java开发工程师",
+    "Java资深工程师": "Java开发工程师",
+    "硬件测试": "硬件测试工程师",
+    "测试工程师": "软件测试工程师（专项方向）",
+    "Python后端开发": "Python后端开发工程师",
+    "数据分析": "数据分析师",
+    "产品": "产品经理",
+}
+
+
+def _match_neo4j_position(job_title: str) -> str:
+    """将前端岗位名称映射到 Neo4j 中的标准名称。"""
+    if not job_title:
+        return ""
+    # 精确匹配
+    if job_title in JOB_NAME_MAP:
+        return JOB_NAME_MAP[job_title]
+    # 模糊匹配：检查映射表的 key 是否被包含
+    for key, value in JOB_NAME_MAP.items():
+        if key in job_title or job_title in key:
+            return value
+    # 无映射，直接使用原标题
+    return job_title
+
+
+@router.get("/job-graph")
+async def get_job_graph(job_title: str, user: dict = Depends(get_current_user)):
+    """获取指定岗位在 Neo4j 中的知识图谱数据"""
+    position = _match_neo4j_position(job_title)
+    if not position:
+        return {"success": False, "error": f"未找到岗位「{job_title}」对应的图谱"}
+
+    try:
+        session = await neo4j_manager.get_session()
+        if session is None:
+            return {"success": False, "error": "Neo4j 连接不可用"}
+
+        # Neo4j 标签为中文：岗位、能力维度、核心要求
+        # 关系类型：包含维度、核心要求
+        cypher = """
+            MATCH (j:`岗位`)-[r*1..2]-(m)
+            WHERE j.name = $jobTitle
+            RETURN j, r, m LIMIT 300
+        """
+        result = await session.run(cypher, jobTitle=position)
+        records = [record async for record in result]
+        await session.close()
+
+        # 构建节点和连线
+        nodes = {}
+        links = []
+
+        def _node_id(node):
+            return str(node.element_id) if hasattr(node, "element_id") else str(node.identity)
+
+        for record in records:
+            for key in ("j", "m"):
+                node = record.get(key)
+                if not node:
+                    continue
+                nid = _node_id(node)
+                if nid in nodes:
+                    continue
+                label = next(iter(node.labels)) if node.labels else "Default"
+                # 岗位和能力维度用 name，核心要求用 content
+                props = dict(node)
+                name = props.get("name") or props.get("content") or label
+                nodes[nid] = {"id": nid, "name": name, "label": label}
+
+            rel = record.get("r")
+            if rel:
+                rels = rel if isinstance(rel, list) else [rel]
+                for r in rels:
+                    src = _node_id(r.start_node)
+                    tgt = _node_id(r.end_node)
+                    links.append({"source": src, "target": tgt})
+
+        if not nodes:
+            return {"success": False, "error": f"Neo4j 中未找到岗位「{position}」的数据"}
+
+        return {
+            "success": True,
+            "data": {
+                "nodes": list(nodes.values()),
+                "links": links,
+                "center": position,
+            },
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
