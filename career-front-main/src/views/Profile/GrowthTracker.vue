@@ -1,21 +1,20 @@
 <template>
   <div class="growth-tracking-center fade-in">
-    <!-- 自定义加载动画 - 仅覆盖右侧内容区域 -->
-    <transition name="loading-fade">
-      <div v-if="pageLoading" class="custom-loading-overlay">
-        <InteractiveLoading
-          title="智能分析中"
-          description="正在融合多维数据，为你生成个性化学习计划"
-          statusText="Career Pilot 引擎运行中"
-          :steps="loadingSteps"
-          :currentStep="currentLoadingStep"
-          :progress="loadingProgress"
-          :showProgress="true"
-          :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书', '岗位']"
-        />
-      </div>
-    </transition>
+    <!-- 加载状态 - 与人岗匹配一致 -->
+    <div v-if="pageLoading" class="loading-section">
+      <InteractiveLoading
+        title="智能分析中"
+        description="正在融合多维数据，为你生成个性化学习计划"
+        statusText="Career Pilot 引擎运行中"
+        :steps="loadingSteps"
+        :currentStep="currentLoadingStep"
+        :progress="loadingProgress"
+        :showProgress="true"
+        :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书', '岗位']"
+      />
+    </div>
 
+    <template v-else>
     <div class="agent-command-bar glass-card">
       <div class="agent-info">
         <div class="agent-avatar">
@@ -116,8 +115,9 @@
     </div>
   </div>
 </el-card>
+    </template>
 
-    <div 
+    <div
   class="floating-agent-wrapper" 
   :class="{ 'is-active': isCoachingOpen, 'is-dragging': isDragging }"
   :style="{ left: position.x + 'px', top: position.y + 'px' }"
@@ -350,12 +350,6 @@ const fetchAllDataAndCache = async (cacheKey) => {
     radarIndicators: radarIndicators.value,
     hasCapabilityData: hasCapabilityData.value,
   })
-
-  await nextTick()
-  setTimeout(() => {
-    initRadarChart()
-    window.addEventListener('resize', handleResize)
-  }, 200)
 }
 
 // 调用 learning_plan agent
@@ -537,14 +531,19 @@ const startLoadingAnimation = () => {
   }, 300)
 }
 
-const stopLoadingAnimation = () => {
+const stopLoadingAnimation = async () => {
   loadingProgress.value = 100
   currentLoadingStep.value = loadingSteps.length
   loadingText.value = '加载完成！'
   clearInterval(loadingTimer)
   clearInterval(progressTimer)
-  setTimeout(() => {
+  setTimeout(async () => {
     pageLoading.value = false
+    await nextTick()
+    setTimeout(() => {
+      initRadarChart()
+      window.addEventListener('resize', handleResize)
+    }, 200)
   }, 300)
 }
 
@@ -644,6 +643,16 @@ watch(selectedJob, async (newJob, oldJob) => {
 
   const cacheKey = generateCacheKey(currentRadarData.value, newJob.job_title)
   await fetchAllDataAndCache(cacheKey)
+})
+
+// 能力数据就绪后初始化雷达图（兜底，防止 stopLoadingAnimation 时序问题）
+watch(hasCapabilityData, async (ready) => {
+  if (ready && !pageLoading.value) {
+    await nextTick()
+    setTimeout(() => {
+      if (!radarInstance && radarChartRef.value) initRadarChart()
+    }, 100)
+  }
 })
 
 // 监听个人信息变化，清除缓存以便下次进入时重新获取
@@ -1265,28 +1274,10 @@ watch(isCoachingOpen, (open) => {
   border: 1px solid rgba(255, 186, 116, 0.2) !important;
 }
 
-/* 加载动画过渡效果 */
-.loading-fade-enter-active,
-.loading-fade-leave-active {
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-.loading-fade-enter-from,
-.loading-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-/* 加载遮罩层 */
-.custom-loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  border-radius: 16px;
+/* 加载状态 - 与人岗匹配风格一致 */
+.loading-section {
+  min-height: 90vh;
+  border-radius: 20px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
 }
 </style>

@@ -2,7 +2,7 @@
 
 ## Context
 
-当前系统是一个职业规划 AI 平台，包含 Python Flask 后端（5 个 DeepSeek Agent）和 Vue 3 前端（全 mock 数据），部署在 Docker Compose（MySQL + Neo4j + Nginx）。代码审查发现 11 个致命 Bug（表缺失、列名不匹配、DB 名不一致、NameError、Nginx 代理错误等），架构混乱（AgentBase 未用、AgentManager 不全、重复目录、无认证、无配置中心）。
+当前系统是一个职业规划 AI 平台，包含 Python Flask 后端（5 个 DeepSeek Agent）和 Vue 3 前端（全 mock 数据），部署在 MySQL + Neo4j 环境。代码审查发现 11 个致命 Bug（表缺失、列名不匹配、DB 名不一致、NameError 等），架构混乱（AgentBase 未用、AgentManager 不全、重复目录、无认证、无配置中心）。
 
 重构目标：
 1. Flask → FastAPI
@@ -40,7 +40,7 @@
 ## 目标架构图
 
 ```
-[Vue 3 SPA] --HTTP--> [Nginx :80] --/api/*--> [FastAPI :8000]
+[Vue 3 SPA] --HTTP--> [FastAPI :8000]
                                                       |
                     +--------------+-------------------+------------------+
                     |              |                   |                  |
@@ -147,9 +147,6 @@ backend/
     test_career_plan.py, test_learning_plan.py
     test_rag.py                          # ★NEW★ 向量检索测试
     
-  docker-compose.yml                     # 新增 Redis + ChromaDB 容器
-  Dockerfile
-  nginx.conf
   requirements.txt
   alembic.ini
   .env.example
@@ -213,24 +210,24 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-ada-002"  # 或 DeepSeek 等价物
     
     # MySQL
-    MYSQL_HOST: str = "backend-mysql"
+    MYSQL_HOST: str = "localhost"
     MYSQL_PORT: int = 3306
     MYSQL_USER: str = "root"
     MYSQL_PASSWORD: str
     MYSQL_DATABASE: str = "career_platform"
     
     # Neo4j
-    NEO4J_URI: str = "bolt://backend-neo4j:7687"
+    NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str
     
     # Redis ★NEW★
-    REDIS_URL: str = "redis://backend-redis:6379/0"
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_CACHE_TTL: int = 3600          # LLM 结果缓存 1 小时
     REDIS_RATE_LIMIT: int = 60           # 每分钟请求数上限
     
     # ChromaDB ★NEW★
-    CHROMA_PERSIST_DIR: str = "/app/chroma_data"
+    CHROMA_PERSIST_DIR: str = "./chroma_data"
     CHROMA_COLLECTION_JOBS: str = "job_descriptions"
     CHROMA_COLLECTION_LEARNING: str = "learning_resources"
     
@@ -245,7 +242,7 @@ class Settings(BaseSettings):
     AGENT_ASYNC_WORKERS: int = 4
     
     # Upload
-    UPLOAD_DIR: str = "/app/uploads"
+    UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 16
 ```
 
@@ -272,28 +269,6 @@ async def cache_agent_result(key: str, value: str, ttl: int): ...
 async def get_cached_agent_result(key: str) -> str | None: ...
 ```
 
-### 1.5 docker-compose.yml 新增服务
-
-```yaml
-redis:
-  image: redis:7-alpine
-  container_name: backend-redis
-  ports: ["6379:6379"]
-  volumes: [redis_data:/data]
-  command: redis-server --appendonly yes
-  networks: [backend-network]
-
-chromadb:
-  image: chromadb/chroma:latest
-  container_name: backend-chromadb
-  ports: ["8001:8000"]
-  volumes: [chroma_data:/chroma/chroma]
-  networks: [backend-network]
-  # 或使用 Python 嵌入式 ChromaDB，无需独立容器
-```
-
----
-
 ## Phase 2: Bug 修复 (Day 2)
 
 ### 2.1 修复所有致命 Bug（11 项，详见审查报告）
@@ -301,7 +276,7 @@ chromadb:
 - 补齐 `user_profiles` 和 `favorites` 表（Alembic migration 001）
 - 统一数据库名 `career_platform`，修所有列名引用
 - `ANALYZE_PROMPT` import 修复
-- Nginx `proxy_pass` → `career-backend:8000`
+
 - 删除 `career_planner/career_planner/` 重复目录
 - `asyncio.new_event_loop()` → `asyncio.run()`
 - `langchain-community` 加入依赖
@@ -641,27 +616,7 @@ async def match_jobs(
 
 ---
 
-## Phase 7: Docker + 部署配置
-
-### 7.1 Docker Compose 最终服务清单
-
-| Service | Container | Port | 新增? |
-|---------|-----------|------|-------|
-| mysql | backend-mysql | 3306 | |
-| neo4j | backend-neo4j | 7474/7687 | |
-| redis | backend-redis | 6379 | ★ |
-| backend | career-backend | 8000 | |
-| frontend | career-frontend | 80 | |
-| arq-worker | arq-worker | - | ★ 异步 Agent 执行 |
-| chromadb | backend-chromadb | 8001 | ★ (可选，可用嵌入模式) |
-
-### 7.2 requirements.txt 见 Phase 1.2
-
-### 7.3 默认不独立跑 ChromaDB 容器 — 使用 Python 嵌入式 ChromaDB (`chromadb.PersistentClient`)，数据持久化到 Docker volume `/app/chroma_data`。如果未来数据量超过 10 万条，再改独立容器。
-
----
-
-## Phase 8: 前端 API 对接
+## Phase 7: 前端 API 对接
 
 ### 8.1 API Client 层 (src/api/)
 
@@ -727,7 +682,7 @@ export const useAuthStore = defineStore('auth', {
 
 ---
 
-## Phase 9: 测试 + 最终验证
+## Phase 8: 测试 + 最终验证
 
 ### 9.1 测试结构
 
@@ -747,7 +702,6 @@ tests/
 ### 9.2 最终验证清单
 
 **基础设施**:
-- [ ] `docker compose up` 6 个容器全部 healthy
 - [ ] `curl localhost:8000/docs` OpenAPI 页面加载
 - [ ] `curl localhost:8000/api/v1/health` 返回 200
 - [ ] 限流中间件生效（60 req/min 返回 429）
@@ -786,11 +740,10 @@ Phase 3: Agent Harness 编排引擎                ─── 2 天  ★
 Phase 4: RAG 知识库                            ─── 2 天  ★
 Phase 5: 4 个 LangGraph Agent                  ─── 3 天
 Phase 6: FastAPI + JWT + 中间件 + 端点         ─── 2 天
-Phase 7: Docker Compose 更新                   ─── 0.5 天
-Phase 8: 前端 API 对接 + 死代码清理            ─── 3 天
-Phase 9: 测试 + 验证                           ─── 2 天
+Phase 7: 前端 API 对接 + 死代码清理            ─── 3 天
+Phase 8: 测试 + 验证                           ─── 2 天
                                       ──────────────
-                                       总计 ~17.5 天
+                                       总计 ~17 天
 ```
 
 Phase 3-4 可并行，Phase 5 可与 Phase 6 部分并行。Phase 8 需等 Phase 5-6 完成后启动。

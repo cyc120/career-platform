@@ -3,6 +3,9 @@
     <!-- Canvas 粒子背景 -->
     <canvas ref="canvasRef" class="particle-canvas"></canvas>
 
+    <!-- 极光背景 -->
+    <div class="aurora-bg"></div>
+
     <!-- 浮动岗位球 - 带鼠标躲避 -->
     <div class="floating-orbs">
       <div
@@ -10,7 +13,7 @@
         :key="idx"
         class="orb-item"
         :style="{
-          transform: `translate(${orb.x}px, ${orb.y}px) scale(${orb.scale})`,
+          transform: `translate(${orb.x}px, ${orb.y}px) scale(${orb.scale}) rotate(${orb.rotation}deg)`,
           width: orb.size + 'px',
           height: orb.size + 'px',
           opacity: orb.opacity,
@@ -30,8 +33,9 @@
       </div>
 
       <div class="loading-animation">
-        <div class="orbit-ring ring-1"></div>
-        <div class="orbit-ring ring-2"></div>
+        <div class="orbit-ring ring-1"><span class="satellite-dot sat-1"></span></div>
+        <div class="orbit-ring ring-2"><span class="satellite-dot sat-2"></span></div>
+        <div class="orbit-ring ring-3"><span class="satellite-dot sat-3"></span></div>
         <div class="core-icon">
           <el-icon><MagicStick /></el-icon>
         </div>
@@ -111,6 +115,7 @@ const orbs = reactive(
     opacity: 0.7 + Math.random() * 0.3,
     isDodging: false,
     floatPhase: Math.random() * Math.PI * 2,
+    rotation: Math.random() * 360,
   }))
 )
 
@@ -166,9 +171,31 @@ const renderLoop = () => {
     canvasCtx.fill()
   })
 
+  // 粒子星座连线
+  const CONNECTION_DIST = 150
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x
+      const dy = particles[i].y - particles[j].y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < CONNECTION_DIST) {
+        const opacity = (1 - dist / CONNECTION_DIST) * 0.25
+        canvasCtx.strokeStyle = `rgba(80, 152, 249, ${opacity})`
+        canvasCtx.lineWidth = 0.6
+        canvasCtx.beginPath()
+        canvasCtx.moveTo(particles[i].x, particles[i].y)
+        canvasCtx.lineTo(particles[j].x, particles[j].y)
+        canvasCtx.stroke()
+      }
+    }
+  }
+
   // 更新浮动球位置
   const time = Date.now() * 0.001
   orbs.forEach((orb, idx) => {
+    // 缓慢旋转
+    orb.rotation = (time * orb.speed * 20) % 360
+
     // 基础浮动动画
     const floatX = Math.sin(time * orb.speed + orb.floatPhase) * 15
     const floatY = Math.cos(time * orb.speed * 0.8 + orb.floatPhase) * 12
@@ -242,9 +269,7 @@ onUnmounted(() => {
   justify-content: center;
   overflow: hidden;
   border-radius: 20px;
-  background: linear-gradient(-45deg, #ff9a9e22, #fad0c422, #afcaf422, #b1efbf22);
-  background-size: 400% 400%;
-  animation: gradientBG 8s ease infinite;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 50%, #f5f0ff 100%);
 }
 
 .particle-canvas {
@@ -255,6 +280,22 @@ onUnmounted(() => {
   height: 100%;
   z-index: 1;
   pointer-events: none;
+}
+
+.aurora-bg {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(80, 152, 249, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(118, 75, 162, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 80%, rgba(67, 233, 123, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 60%, rgba(250, 112, 154, 0.08) 0%, transparent 50%);
+  animation: auroraMove 12s ease-in-out infinite alternate;
 }
 
 .floating-orbs {
@@ -280,6 +321,17 @@ onUnmounted(() => {
     0 8px 32px rgba(31, 38, 135, 0.08);
   cursor: default;
   will-change: transform;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -15%;
+    border-radius: 50%;
+    background: inherit;
+    filter: blur(12px);
+    opacity: 0.4;
+    z-index: -1;
+  }
 }
 
 .orb-label {
@@ -334,21 +386,60 @@ onUnmounted(() => {
 .orbit-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2px solid transparent;
 }
 
 .ring-1 {
   inset: 0;
-  border-top-color: #5098f9;
-  border-right-color: rgba(80, 152, 249, 0.3);
+  background: conic-gradient(from 0deg, #5098f9, rgba(80, 152, 249, 0.15), #5098f9);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
   animation: spinRing 2s linear infinite;
 }
 
 .ring-2 {
   inset: 12px;
-  border-bottom-color: #764ba2;
-  border-left-color: rgba(118, 75, 162, 0.3);
+  background: conic-gradient(from 120deg, #764ba2, rgba(118, 75, 162, 0.15), #764ba2);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
   animation: spinRing 3s linear infinite reverse;
+}
+
+.ring-3 {
+  inset: -10px;
+  background: conic-gradient(from 240deg, #4facfe, rgba(79, 172, 254, 0.1), #43e97b, rgba(67, 233, 123, 0.1), #4facfe);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #fff calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #fff calc(100% - 1.5px));
+  animation: spinRing 5s linear infinite;
+  opacity: 0.6;
+}
+
+.satellite-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5098f9;
+  box-shadow: 0 0 8px rgba(80, 152, 249, 0.6);
+  top: -3px;
+  left: 50%;
+  margin-left: -3px;
+}
+
+.sat-2 {
+  background: #764ba2;
+  box-shadow: 0 0 8px rgba(118, 75, 162, 0.6);
+  top: auto;
+  bottom: -3px;
+  left: 50%;
+}
+
+.sat-3 {
+  background: #4facfe;
+  box-shadow: 0 0 8px rgba(79, 172, 254, 0.6);
+  top: 50%;
+  left: -3px;
+  margin-left: 0;
+  margin-top: -3px;
 }
 
 .core-icon {
@@ -395,16 +486,22 @@ onUnmounted(() => {
   gap: 12px;
   font-size: 13px;
   color: #94a3b8;
-  transition: all 0.3s;
+  opacity: 0.4;
+  transform: translateX(-8px);
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .step-item.active {
   color: #5098f9;
   font-weight: 600;
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .step-item.done {
   color: #6bd089;
+  opacity: 0.85;
+  transform: translateX(0);
 }
 
 .step-indicator {
@@ -449,12 +546,37 @@ onUnmounted(() => {
   background: linear-gradient(90deg, #5098f9, #764ba2);
   border-radius: 2px;
   transition: width 0.4s ease;
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 50% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
 }
 
-@keyframes gradientBG {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes auroraMove {
+  0% { transform: translate(0%, 0%) rotate(0deg) scale(1); }
+  33% { transform: translate(5%, -3%) rotate(2deg) scale(1.05); }
+  66% { transform: translate(-3%, 5%) rotate(-1deg) scale(0.98); }
+  100% { transform: translate(2%, -2%) rotate(1deg) scale(1.02); }
 }
 
 @keyframes spinRing {
