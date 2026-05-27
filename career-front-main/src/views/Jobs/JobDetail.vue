@@ -535,15 +535,12 @@ const toggleFavorite = async () => {
 .detail-block {
   margin-bottom: 20px;
   padding: 16px 20px;
-  background: linear-gradient(135deg, rgba(64, 158, 255, 0.04) 0%, rgba(103, 194, 58, 0.04) 100%);
-  border-radius: 12px;
-  border: 1px solid rgba(64, 158, 255, 0.1);
 }
 
 .block-title {
   font-size: 16px;
   font-weight: 700;
-  color: #2c3e50;
+  color: #0e3155;
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
@@ -559,7 +556,7 @@ const toggleFavorite = async () => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #409EFF, #67C23A);
+  background: linear-gradient(135deg, #89bdf1, #f5d0ef);
   flex-shrink: 0;
 }
 
@@ -596,7 +593,7 @@ const toggleFavorite = async () => {
 
 .company-desc-section {
   margin-top: 20px;
-  padding-top: 16px;
+  padding: 16px 20px;
   border-top: 1px dashed #e0e0e0;
 }
 
