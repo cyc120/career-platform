@@ -391,6 +391,11 @@ const initChatGreeting = async () => {
 }
 
 onMounted(async () => {
+  // 如果已有画像数据（雷达图有非零值），直接展示填写完的界面
+  if (currentRadarData.value && currentRadarData.value.some(v => v > 0)) {
+    isInfoFilled.value = true
+  }
+
   // 已有聊天记录则跳过问候
   if (chatMessages.value.length === 0) {
     initChatGreeting()
