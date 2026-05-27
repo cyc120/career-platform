@@ -168,93 +168,119 @@
         </div>
       </section>
 
-      <!-- 右列 -->
+      <!-- 右列：个人画像面板 -->
       <section class="right-panel">
-  <el-card class="panel-card roadmap-focus-card" @mouseenter="stopAutoPlay" @mouseleave="startAutoPlay">
-    <div class="ai-status-bar">
-      <div class="pulse-dot"></div>
-      <span>AI 职场导航引擎：{{ isFrontPage ? '核心概览' : '深度指令' }}</span>
-    </div>
+        <el-card class="panel-card roadmap-focus-card" @mouseenter="stopAutoPlay" @mouseleave="startAutoPlay">
+          <!-- 顶部状态栏 -->
+          <div class="rp-status-bar">
+            <div class="pulse-dot"></div>
+            <span>AI 职场导航引擎</span>
+          </div>
 
-    <div class="stack-viewport">
-      <div :class="['stack-item', isFrontPage ? 'is-front' : 'is-back']">
-        <div :class="['stack-item', isFrontPage ? 'is-front' : 'is-back']">
-          <div class="mini-profile">
-            <el-avatar :size="40" src="你的头像地址" />
-            <div class="profile-text">
-              <div class="user-name">user <el-tag size="mini" type="success">就绪</el-tag></div>
-              <div class="user-sub">xxx大学 · 计算机科学与技术</div>
+          <!-- 加载态 -->
+          <div v-if="profileLoading" class="rp-loading">
+            <el-skeleton :rows="5" animated />
+          </div>
+
+          <!-- 空态：未填写个人信息 -->
+          <div v-else-if="!hasProfile" class="rp-empty">
+            <div class="rp-empty-illustration">
+              <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="60" cy="60" r="56" fill="#f0f5ff" stroke="#d6e4ff" stroke-width="2" stroke-dasharray="6 4"/>
+                <path d="M60 30c-8 0-14 6-14 14s6 14 14 14 14-6 14-14-6-14-14-14z" fill="#bfcfff"/>
+                <path d="M38 78c0-12 10-22 22-22s22 10 22 22" stroke="#97aaff" stroke-width="3" stroke-linecap="round" fill="none"/>
+                <circle cx="88" cy="36" r="6" fill="#ffd6d6"/>
+                <path d="M85 36h6M88 33v6" stroke="#ff9999" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="rp-empty-title">暂无个人画像</div>
+            <div class="rp-empty-desc">前往个人中心填写简历信息，<br/>AI 将为你生成职场画像与每日任务</div>
+            <el-button type="primary" round class="rp-empty-btn" @click="router.push('/profile/info')">
+              <el-icon><User /></el-icon> 前往个人中心
+            </el-button>
+          </div>
+
+          <!-- 有数据：个人信息 + 每日任务 -->
+          <div v-else class="rp-content">
+            <!-- 第一页：画像概览 + 每日任务 -->
+            <div :class="['rp-page rp-page-front', { 'is-back': !isFrontPage }]">
+              <!-- 用户头像行 + 综合评分 -->
+              <div class="rp-user-row">
+                <el-avatar :size="36" :src="auth.user?.avatar || ''" />
+                <div class="rp-user-info">
+                  <div class="rp-user-name">
+                    {{ auth.user?.name || auth.user?.username || '用户' }}
+                    <el-tag size="small" type="success" effect="plain">就绪</el-tag>
+                  </div>
+                  <div class="rp-user-sub">{{ auth.user?.university || auth.user?.school || '' }} {{ auth.user?.major ? '· ' + auth.user.major : '' }}</div>
+                </div>
+                <div class="rp-score-badge">
+                  <div class="rp-score-num">{{ overallScore }}</div>
+                  <div class="rp-score-label">综合评定</div>
+                </div>
+              </div>
+
+              <!-- 七维度网格 -->
+              <div class="rp-radar-grid">
+                <div v-for="(dim, idx) in RADAR_DIMS" :key="dim" class="rp-radar-cell">
+                  <span class="rp-radar-val" :class="{ active: currentRadarData[idx] > 0 }">{{ currentRadarData[idx] || 0 }}</span>
+                  <span class="rp-radar-name">{{ dim }}</span>
+                </div>
+              </div>
+
+              <!-- 每日任务 -->
+              <div class="rp-tasks">
+                <div class="rp-tasks-header">
+                  <el-icon><Calendar /></el-icon>
+                  <span>每日待办</span>
+                  <el-tag size="small" type="info" effect="plain" class="rp-tasks-tag">Agent 推荐</el-tag>
+                </div>
+                <div v-if="tasksLoading" class="rp-tasks-loading">
+                  <div v-for="i in 3" :key="i" class="rp-task-skeleton">
+                    <div class="skel-check"></div>
+                    <div class="skel-line" :style="{ width: [85, 65, 75][i - 1] + '%' }"></div>
+                  </div>
+                </div>
+                <div v-else class="rp-tasks-list">
+                  <div v-for="task in dailyTasks" :key="task.id" class="rp-task-item">
+                    <el-checkbox v-model="task.completed" />
+                    <span :class="['rp-task-text', { done: task.completed }]">{{ task.text }}</span>
+                  </div>
+                  <div v-if="dailyTasks.length === 0" class="rp-tasks-empty">暂无待办任务</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 第二页：能力缺口 + Agent 建议 -->
+            <div :class="['rp-page rp-page-back', { 'is-front': !isFrontPage }]">
+              <div class="rp-gap-title">能力差距分析</div>
+              <div class="rp-gap-list">
+                <div v-for="gap in skillGaps" :key="gap.name" class="rp-gap-item">
+                  <div class="rp-gap-head">
+                    <span class="rp-gap-name">{{ gap.name }}</span>
+                    <span :class="['rp-gap-tag', gap.level]">{{ gap.status }}</span>
+                  </div>
+                  <el-progress :percentage="gap.percent" :stroke-width="5" :show-text="false" :color="gap.color" />
+                </div>
+                <div v-if="skillGaps.length === 0" class="rp-tasks-empty">暂无缺口数据</div>
+              </div>
+
+              <div class="rp-advice">
+                <div class="rp-advice-header">
+                  <el-icon class="rp-advice-icon"><MagicStick /></el-icon>
+                  <span>Agent 建议</span>
+                </div>
+                <p class="rp-advice-text">{{ shortAgentAdvice }}</p>
+              </div>
             </div>
           </div>
-  <div class="target-section">
-    <div class="target-label">个人数字资产 (Real-time)</div>
-    <div class="target-title">当前职场画像状态</div>
-    <div class="match-score-group">
-      <div class="score-item">
-        <span class="score-num">{{ skillCompleteness }}%</span>
-        <span class="score-text">技能完整度</span>
-      </div>
-      <div class="divider"></div>
-      <div class="score-item">
-        <span class="score-num">{{ competitivenessScore }}</span>
-        <span class="score-text">竞争力评分</span>
-      </div>
-    </div>
-  </div>
 
-  <div class="daily-todo-section">
-    <div class="todo-header">
-      <el-icon><Calendar /></el-icon> 每日待办 (同步自 Agent)
-    </div>
-    <div class="todo-list-mini">
-      <div v-for="task in dailyTasks" :key="task.id" class="mini-todo-item">
-        <el-checkbox v-model="task.completed" class="custom-todo-check">
-          <span :class="['todo-text', { 'is-completed': task.completed }]">
-            {{ task.content }}
-          </span>
-        </el-checkbox>
-      </div>
-    </div>
-  </div>
-</div>
-      </div>
-
-      <div :class="['stack-item', !isFrontPage ? 'is-front' : 'is-back']">
-  <div class="target-section">
-    <div class="target-label">能力差距分析 (Gap Analysis)</div>
-    <div class="target-title">核心技能缺口诊断</div>
-  </div>
-  
-  <div class="gap-analysis-list">
-    <div v-for="gap in skillGaps" :key="gap.name" class="gap-row-item">
-      <div class="gap-info">
-        <span class="gap-name">{{ gap.name }}</span>
-        <span :class="['gap-tag', gap.level]">{{ gap.status }}</span>
-      </div>
-      <el-progress 
-        :percentage="gap.percent" 
-        :stroke-width="6" 
-        :show-text="false"
-        :color="gap.color"
-      />
-    </div>
-  </div>
-
-  <div class="ai-agent-suggestion-card diagnosis">
-    <div class="sug-header">
-      <el-icon class="pulse-icon"><MagicStick /></el-icon>
-      <span>Agent 指令：</span>
-    </div>
-    <p class="advice-text">{{ shortAgentAdvice }}</p>
-  </div>
-</div>
-    </div>
-
-    <el-button type="primary" class="full-path-link" round @click="$router.push('/growth-tracking')">
-      查看完整全周期规划 <el-icon><ArrowRight /></el-icon>
-    </el-button>
-  </el-card>
-</section>
+          <!-- 底部入口 -->
+          <el-button type="primary" class="rp-bottom-btn" round @click="$router.push('/growth-tracking')">
+            查看完整全周期规划 <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </el-card>
+      </section>
     </main>
 
     <!-- 3. 底部区域：热门岗位推荐 -->
@@ -396,6 +422,7 @@ import * as echarts from 'echarts'
 import { jobsApi } from '@/api/jobs'
 import { resumeApi } from '@/api/resume'
 import { learningPlanApi } from '@/api/learningPlan'
+import { currentRadarData } from '@/views/Profile/profileState'
 import { useAuthStore } from '@/stores/auth'
 import JobCard from '@/components/JobCard.vue'
 import gsap from 'gsap'
@@ -403,6 +430,22 @@ import { UserFilled } from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
 const hotJobs = ref([])
+
+const RADAR_DIMS = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
+const RADAR_WEIGHTS = [0.18, 0.15, 0.18, 0.16, 0.10, 0.10, 0.13]
+
+const overallScore = computed(() => {
+  const radar = currentRadarData.value
+  if (!radar || !radar.some(v => v > 0)) return 0
+  let totalScore = 0, totalWeight = 0
+  radar.forEach((score, i) => {
+    if (score > 0) {
+      totalScore += score * RADAR_WEIGHTS[i]
+      totalWeight += RADAR_WEIGHTS[i]
+    }
+  })
+  return totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0
+})
 
 const loadHotJobs = async () => {
   try {
@@ -433,6 +476,35 @@ const userDataFallback = {
 }
 
 const isProfileCompleted = ref(!!sessionStorage.getItem('is_profile_completed'))
+const hasProfile = ref(false)
+const profileLoading = ref(true)
+
+const checkProfileStatus = async () => {
+  try {
+    // 1. 当前会话已填写（SPA 内 radar 数据非零）
+    const hasRadar = currentRadarData.value && currentRadarData.value.some(v => v > 0)
+    if (hasRadar) {
+      hasProfile.value = true
+      isProfileCompleted.value = true
+      sessionStorage.setItem('is_profile_completed', 'true')
+      return
+    }
+    // 2. 从个人中心保存后跳转过来（一次性标记，读后即删）
+    if (sessionStorage.getItem('profile_saved') === 'true') {
+      sessionStorage.removeItem('profile_saved')
+      hasProfile.value = true
+      isProfileCompleted.value = true
+      sessionStorage.setItem('is_profile_completed', 'true')
+      return
+    }
+    // 3. 未填写 → 显示空态
+    hasProfile.value = false
+  } catch {
+    hasProfile.value = false
+  } finally {
+    profileLoading.value = false
+  }
+}
 
 const dismissGuide = () => {
   isProfileCompleted.value = true
@@ -462,18 +534,20 @@ const currentPage = ref(1)
 const pageDirection = ref('slide-left')
 let autoPlayTimer = null
 
-const skillCompleteness = ref(82)
-const competitivenessScore = ref(75)
+const skillCompleteness = ref(0)
+const competitivenessScore = ref(0)
 const dailyTasks = ref([])
 const skillGaps = ref([])
 const shortAgentAdvice = ref('正在获取 Agent 建议...')
+const tasksLoading = ref(true)
 
-// 从 resume_analyzer + learning_plan agent 获取数据
+// 从 resume_analyzer + learning_plan + dailyTasks 获取数据
 const fetchDashboardData = async () => {
   try {
-    const [resumeRes, planRes] = await Promise.all([
+    const [resumeRes, planRes, tasksRes] = await Promise.all([
       resumeApi.analyze({}),
       learningPlanApi.generate({ plan_type: '长期' }),
+      learningPlanApi.dailyTasks({ phase_index: 0 }),
     ])
     // 竞争力评分 & 技能完整度
     const rData = resumeRes.data
@@ -508,22 +582,27 @@ const fetchDashboardData = async () => {
       if (gaps.length > 0) skillGaps.value = gaps.slice(0, 4)
     }
 
-    // 每日待办 & Agent 建议
+    // Agent 建议
     const pData = planRes.data
-    if (pData.daily_tasks) {
-      dailyTasks.value = pData.daily_tasks.slice(0, 4).map((t, i) => ({
-        id: t.id || i + 1,
-        content: t.content || t.title || t.task,
-        completed: false,
-      }))
-    }
     if (pData.learning_plan?.agent_advice) {
       shortAgentAdvice.value = pData.learning_plan.agent_advice
     } else if (pData.learning_plan?.summary) {
       shortAgentAdvice.value = pData.learning_plan.summary
     }
+
+    // 每日待办（与 GrowthTracker 同源：learningPlanApi.dailyTasks）
+    const tData = tasksRes.data
+    if (tData.daily_tasks && tData.daily_tasks.length > 0) {
+      dailyTasks.value = tData.daily_tasks.slice(0, 6).map((t, i) => ({
+        id: t.id || i + 1,
+        text: t.content || t.title || t.task || `任务 ${i + 1}`,
+        completed: false,
+      }))
+    }
   } catch {
     // 静默降级，使用默认值
+  } finally {
+    tasksLoading.value = false
   }
 }
 
@@ -940,6 +1019,7 @@ const goToProfile = () => router.push('/profile/info')
 // 生命周期
 onMounted(() => {
   loadHotJobs()
+  checkProfileStatus()
   fetchDashboardData()
   window.addEventListener('resize', handleResize)
 })
@@ -1731,145 +1811,6 @@ const handleResize = () => {
 /* 🎨 登录面板美化：AI 科技感 + 毛玻璃材质 */
 /* ========================================================== */
 
-/* 每日待办区域样式 */
-.daily-todo-section {
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 12px;
-  border: 1px solid rgba(220, 223, 230, 0.5);
-
-  .todo-header {
-    font-size: 13px;
-    font-weight: bold;
-    color: #606266;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    
-    .el-icon { color: #409eff; }
-  }
-
-  .todo-list-mini {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-
-    .mini-todo-item {
-      padding: 8px 12px;
-      background: #ffffff;
-      border-radius: 8px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      border: 1px solid transparent;
-
-      &:hover {
-        border-color: #d1e9ff;
-        transform: translateX(5px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-      }
-
-      .custom-todo-check {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        
-        :deep(.el-checkbox__label) {
-          padding-left: 10px;
-          flex: 1;
-        }
-      }
-
-      .todo-text {
-        font-size: 13px;
-        color: #303133;
-        transition: all 0.3s;
-        
-        &.is-completed {
-          color: #c0c4cc;
-          text-decoration: line-through;
-        }
-      }
-    }
-  }
-}
-
-/* 缺口罗列样式 */
-.gap-analysis-list {
-  margin: 15px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  .gap-row-item {
-    .gap-info {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-      
-      .gap-name {
-        font-size: 13px;
-        color: #303133;
-        font-weight: 500;
-      }
-      
-      .gap-tag {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 10px;
-        &.danger { background: #fef0f0; color: #f56c6c; }
-        &.warning { background: #fdf6ec; color: #e6a23c; }
-        &.info { background: #f4f4f5; color: #909399; }
-      }
-    }
-  }
-}
-
-/* Agent 建议增强 */
-.ai-agent-suggestion-card.diagnosis {
-  margin-top: 20px;
-  background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
-  border: 1px solid #d1e9ff;
-  border-left: 4px solid #409eff;
-  
-  .advice-text {
-    font-size: 12px;
-    line-height: 1.6;
-    color: #606266;
-    margin: 8px 0 0;
-  }
-}
-
-/* 呼吸灯动画：增加AI感 */
-.pulse-icon {
-  animation: breath 2s infinite ease-in-out;
-}
-@keyframes breath {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.2); opacity: 0.7; }
-}
-
-.mini-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 15px;
-  border-bottom: 1px dashed #ebeef5;
-  
-  .user-name {
-    font-size: 16px;
-    font-weight: bold;
-    color: #303133;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .user-sub {
-    font-size: 12px;
-    color: #909399;
-    margin-top: 2px;
-  }
-}
 
 .auth-card {
   border-radius: 24px !important;
@@ -2000,85 +1941,6 @@ const handleResize = () => {
   }
 }
 
-/* 锁定右侧卡片尺寸，确保布局不跳动 */
-/* 锁定卡片高度，确保不挤压外部布局 */
-.roadmap-focus-card {
-  height: 570px; 
-  position: relative;
-  overflow: hidden;
-}
-
-.roadmap-focus-card :deep(.el-card__body) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 24px !important;
-}
-
-/* 🌟 核心：开启 3D 视角 */
-.stack-viewport {
-  flex: 1;
-  position: relative;
-  perspective: 1200px; /* 景深强度 */
-  margin: 15px 0;
-}
-
-.stack-item {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); /* 具有 Mobbin 感的弹性缓动 */
-  background: white;
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 🌟 前景状态：位于中心，完全清晰 */
-.is-front {
-  transform: translateZ(0) translateY(0);
-  opacity: 1;
-  z-index: 2;
-  filter: blur(0);
-}
-
-/* 🌟 后景状态：向深处退去，缩小，下沉，模糊 */
-.is-back {
-  transform: translateZ(-120px) translateY(30px) scale(0.85);
-  opacity: 0.3;
-  z-index: 1;
-  filter: blur(4px);
-  pointer-events: none; /* 后面的容器不可点击 */
-}
-
-/* 第二页容器特有样式 */
-.ai-agent-suggestion-card {
-  margin-top: auto;
-  background: rgba(64, 158, 255, 0.05);
-  border-left: 3px solid #409eff;
-  padding: 15px;
-  border-radius: 8px;
-}
-.ai-agent-suggestion-card p {
-  font-size: 12px;
-  line-height: 1.6;
-  color: #5f6c7b;
-  margin-top: 5px;
-}
-
-/* 旋转光效动画 */
-@keyframes rotateLight {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 旋转光效动画 */
-@keyframes rotateLight {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 
 // ========== 4. 动画定义 ==========
 @keyframes gradientBG {
@@ -2304,55 +2166,448 @@ const handleResize = () => {
 
 }
 
-/* 右侧卡片专属呈现样式 */
+/* ========================================================== */
+/* 右侧面板 right-panel 完整样式                            */
+/* ========================================================== */
+
 .roadmap-focus-card {
-  background: rgba(255, 255, 255, 0.85) !important; /* 实体感稍强一点 */
+  background: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(15px);
   border-radius: 24px !important;
   border: 1px solid rgba(64, 158, 255, 0.15) !important;
-  height: 570px; /* 强制锁定高度，不因内容变少而缩水 */
+  height: 570px;
   display: flex;
   flex-direction: column;
 }
 
-/* 顶部：科技感状态 */
-.ai-status-bar {
+.roadmap-focus-card :deep(.el-card__body) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px !important;
+}
+
+/* 顶部状态栏 */
+.rp-status-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 11px;
+  font-weight: 600;
   color: #409eff;
-  margin-bottom: 20px; /* 增加呼吸空间 */
+  margin-bottom: 16px;
+
   .pulse-dot {
-    width: 6px; height: 6px; background: #409eff; border-radius: 50%;
-    box-shadow: 0 0 8px #409eff; animation: blink 1.5s infinite;
+    width: 6px;
+    height: 6px;
+    background: #409eff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #409eff;
+    animation: blink 1.5s infinite;
   }
 }
 
-/* 目标聚焦：丰富了对比数据 */
-.target-section {
+/* 加载态 */
+.rp-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 20px 0;
+}
+
+/* ---- 空态 ---- */
+.rp-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+
+  .rp-empty-illustration {
+    width: 110px;
+    height: 110px;
+    animation: rpFloat 4s ease-in-out infinite;
+    border-radius: 50%; /* 确保阴影的外形是完美的圆形 */
+    box-shadow: 0 8px 24px rgba(149, 215, 247, 0.777); /* 核心阴影代码 */
+    svg { width: 100%; height: 100%; }
+  }
+
+  .rp-empty-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #303133;
+  }
+
+  .rp-empty-desc {
+    font-size: 13px;
+    color: #909399;
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  .rp-empty-btn {
+    margin-top: 4px;
+    padding: 10px 28px;
+    font-size: 14px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #98c8f7 0%, #f0cbe5 100%) !important;
+    border: none !important;
+    color: #fffff8 !important;
+    box-shadow: 0 4px 15px rgba(64, 158, 255, 0.3);
+    transition: all 0.3s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(64, 158, 255, 0.4);
+    }
+  }
+}
+
+@keyframes rpFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ---- 有数据内容区 ---- */
+.rp-content {
+  flex: 1;
+  position: relative;
+  perspective: 1200px;
+  overflow: hidden;
+}
+
+/* 翻页卡片 */
+.rp-page {
+  position: absolute;
+  inset: 0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #fff;
+  border-radius: 14px;
+
+  &.rp-page-front.is-back {
+    transform: translateZ(-100px) translateY(20px) scale(0.88);
+    opacity: 0.25;
+    filter: blur(3px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  &.rp-page-back {
+    transform: translateZ(-100px) translateY(20px) scale(0.88);
+    opacity: 0.25;
+    filter: blur(3px);
+    pointer-events: none;
+    z-index: 1;
+
+    &.is-front {
+      transform: translateZ(0) translateY(0) scale(1);
+      opacity: 1;
+      filter: blur(0);
+      pointer-events: auto;
+      z-index: 2;
+    }
+  }
+
+  &.rp-page-front:not(.is-back) {
+    z-index: 2;
+  }
+}
+
+/* 用户头像行 + 综合评分 */
+.rp-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #ebeef5;
+}
+
+.rp-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-user-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp-user-sub {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-score-badge {
   text-align: center;
-  margin-bottom: 35px; /* 增加 Margin 填补空间 */
-  margin-top: 10px;
-  .target-label { font-size: 12px; color: #909399; }
-  .target-title { font-size: 18px; font-weight: bold; color: #303133; margin: 6px 0 10px; }
-  
-  .match-score-group {
-    display: flex; justify-content: center; align-items: center; gap: 15px;
-    .divider { width: 1px; height: 25px; background: #dcdfe6; }
-    .score-num { font-size: 26px; font-weight: 800; color: #409eff; line-height: 1; }
-    .score-text { font-size: 10px; color: #909399; margin-top: 4px; }
-    /* 让增长分数变成金色或绿色 */
-    .score-item:last-child .score-num { color: #e6a23c; }
+  flex-shrink: 0;
+}
+
+.rp-score-num {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, #409EFF 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.rp-score-label {
+  font-size: 10px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+/* 七维度网格 */
+.rp-radar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 10px;
+  background: rgba(64, 158, 255, 0.04);
+  border-radius: 10px;
+}
+
+.rp-radar-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 0;
+}
+
+.rp-radar-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: #c0c4cc;
+
+  &.active { color: #409eff; }
+}
+
+.rp-radar-name {
+  font-size: 10px;
+  color: #909399;
+}
+
+/* 每日任务 */
+.rp-tasks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.rp-tasks-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+
+  .el-icon { color: #409eff; }
+}
+
+.rp-tasks-tag {
+  margin-left: auto;
+}
+
+.rp-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 2px;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #dcdfe6;
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
+.rp-task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: #fafafa;
+  border-radius: 8px;
+  transition: all 0.2s;
 
-.full-path-link {
-  width: 100%; margin-top: 20px; font-size: 13px;
-  background: transparent !important; color: #409eff !important;
+  &:hover {
+    background: #f0f5ff;
+    transform: translateX(3px);
+  }
+}
+
+.rp-task-text {
+  font-size: 13px;
+  color: #303133;
+  flex: 1;
+
+  &.done {
+    color: #c0c4cc;
+    text-decoration: line-through;
+  }
+}
+
+.rp-tasks-empty {
+  font-size: 12px;
+  color: #c0c4cc;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* 任务加载骨架屏 */
+.rp-tasks-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.rp-task-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border-radius: 8px;
+
+  .skel-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: rpShimmer 1.5s infinite;
+    flex-shrink: 0;
+  }
+
+  .skel-line {
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: rpShimmer 1.5s infinite;
+  }
+}
+
+@keyframes rpShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---- 第二页：能力缺口 + Agent 建议 ---- */
+.rp-gap-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.rp-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rp-gap-item {
+  .rp-gap-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+
+  .rp-gap-name {
+    font-size: 13px;
+    color: #303133;
+    font-weight: 500;
+  }
+
+  .rp-gap-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+
+    &.danger { background: #fef0f0; color: #f56c6c; }
+    &.warning { background: #fdf6ec; color: #e6a23c; }
+    &.info { background: #f4f4f5; color: #909399; }
+  }
+}
+
+/* Agent 建议 */
+.rp-advice {
+  margin-top: auto;
+  background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
+  border: 1px solid #d1e9ff;
+  border-left: 4px solid #409eff;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.rp-advice-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+}
+
+.rp-advice-icon {
+  animation: rpBreath 2s infinite ease-in-out;
+}
+
+@keyframes rpBreath {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
+
+.rp-advice-text {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #606266;
+  margin: 6px 0 0;
+}
+
+/* 底部按钮 */
+.rp-bottom-btn {
+  width: 100%;
+  margin-top: auto;
+  font-size: 13px;
+  background: transparent !important;
+  color: #409eff !important;
   border-color: #409eff !important;
-  &:hover { background: rgba(64, 158, 255, 0.05) !important; }
+
+  &:hover {
+    background: rgba(64, 158, 255, 0.05) !important;
+  }
 }
 
 @keyframes pulse {

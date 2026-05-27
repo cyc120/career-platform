@@ -541,6 +541,7 @@ const saveAndContinue = () => {
     return
   }
   isInfoFilled.value = true
+  sessionStorage.setItem('profile_saved', 'true')
   ElMessage.success('简历保存成功！')
 }
 
