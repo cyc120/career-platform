@@ -50,15 +50,28 @@
           </el-empty>
         </div>
         <div v-else class="description">
+          <!-- 岗位详情（结构化展示） -->
           <div v-if="job.jobDetails" class="job-details-section">
-            <pre class="details-pre">{{ job.jobDetails }}</pre>
+            <template v-for="(block, bi) in parseJobDetails(job.jobDetails)" :key="bi">
+              <div class="detail-block">
+                <h4 class="block-title">
+                  <span class="block-dot"></span>{{ block.title }}
+                </h4>
+                <ul class="block-list">
+                  <li v-for="(item, ii) in block.items" :key="ii">{{ item }}</li>
+                </ul>
+              </div>
+            </template>
           </div>
           <div v-else>
             <p>{{ formatDescription(job.description) || '暂无详细描述' }}</p>
           </div>
+          <!-- 公司介绍 -->
           <div v-if="job.companyDescription" class="company-desc-section">
-            <h4 class="section-subtitle">公司介绍</h4>
-            <pre class="details-pre">{{ job.companyDescription }}</pre>
+            <h4 class="section-subtitle">
+              <el-icon><OfficeBuilding /></el-icon> 公司介绍
+            </h4>
+            <div class="company-desc-content">{{ job.companyDescription }}</div>
           </div>
           <img src="@/assets/3D programmer.png" class="card-decoration" />
         </div>
@@ -90,7 +103,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft, Star, StarFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Star, StarFilled, OfficeBuilding } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { jobsApi } from '@/api/jobs'
 import { favoritesApi } from '@/api/favorites'
@@ -141,6 +154,37 @@ const goBack = () => router.back()
 const formatDescription = (desc) => {
   if (!desc) return ''
   return desc.replace(/；/g, '\n').replace(/\\n/g, '\n')
+}
+
+const parseJobDetails = (text) => {
+  if (!text) return []
+  const blocks = []
+  let currentBlock = null
+  const lines = text.split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    // 匹配大标题行，如 "1. 岗位职责" "2. 任职要求"
+    const titleMatch = trimmed.match(/^[1-9]\d*[\.\、]\s*(.+)/)
+    if (titleMatch) {
+      currentBlock = { title: titleMatch[1], items: [] }
+      blocks.push(currentBlock)
+      continue
+    }
+    // 匹配子项，如 "1) xxx" "2) xxx" "- xxx" "• xxx" 或纯文本行
+    const itemMatch = trimmed.match(/^(?:\d+[\)\.、]|[•\-–—]\s*)\s*(.+)/)
+    if (itemMatch) {
+      if (!currentBlock) {
+        currentBlock = { title: '详情', items: [] }
+        blocks.push(currentBlock)
+      }
+      currentBlock.items.push(itemMatch[1])
+    } else if (currentBlock && !trimmed.match(/^[1-9]\d*[\.\、]/)) {
+      // 普通文本行归入当前块
+      currentBlock.items.push(trimmed)
+    }
+  }
+  return blocks
 }
 
 const toggleFavorite = async () => {
@@ -486,6 +530,68 @@ const toggleFavorite = async () => {
 
 .job-details-section {
   margin-bottom: 20px;
+}
+
+.detail-block {
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.04) 0%, rgba(103, 194, 58, 0.04) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(64, 158, 255, 0.1);
+}
+
+.block-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.block-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #409EFF, #67C23A);
+  flex-shrink: 0;
+}
+
+.block-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    padding: 6px 0;
+    padding-left: 18px;
+    position: relative;
+    font-size: 14px;
+    color: #556677;
+    line-height: 1.8;
+
+    &::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: #409EFF;
+      font-size: 12px;
+    }
+  }
+}
+
+.company-desc-content {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .company-desc-section {
