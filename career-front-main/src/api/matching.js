@@ -10,6 +10,9 @@ export const matchingApi = {
   getSelectedJob() {
     return api.get('/matching/selected-job')
   },
+  clearSelectedJob() {
+    return api.delete('/matching/selected-job')
+  },
   hasMatching() {
     return api.get('/matching/has-matching')
   },

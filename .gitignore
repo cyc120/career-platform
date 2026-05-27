@@ -96,6 +96,9 @@ temp/
 # ChromaDB vector index
 chroma_data/
 
+# Large data files
+backend/data/
+
 # Temp analysis files
 filter_data.txt
 

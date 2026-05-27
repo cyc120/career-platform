@@ -111,6 +111,11 @@
                   class="lock-btn"
                   @click.stop="lockJob(idx)"
                 />
+                <el-icon
+                  v-if="job.job_id"
+                  class="detail-icon"
+                  @click.stop="router.push(`/job/${job.job_id}`)"
+                ><Link /></el-icon>
                 <div class="job-score">
                   <span class="score-value">{{ job.total_score }}</span>
                   <span class="score-label">分</span>
@@ -362,6 +367,7 @@ const lockJob = async (idx) => {
     hasMatchData.value = false
     parentSelectedJob.value = null
     sessionStorage.removeItem('growth_tracker_cache')
+    matchingApi.clearSelectedJob().catch(() => {})
     ElMessage.info('已取消锁定')
     return
   }
@@ -888,6 +894,17 @@ watch(currentRadarData, (newVal, oldVal) => {
       .lock-btn {
         flex-shrink: 0;
         transition: all 0.2s;
+      }
+
+      .detail-icon {
+        flex-shrink: 0;
+        cursor: pointer;
+        color: var(--el-text-color-secondary);
+        font-size: 16px;
+        transition: color 0.2s;
+        &:hover {
+          color: var(--el-color-primary);
+        }
       }
     }
   }

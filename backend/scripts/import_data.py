@@ -4,7 +4,7 @@ import sqlite3
 import re
 import os
 
-DATA_PATH = "D:/HDU ITMO/服务外包/code/career-front/src/assets/data.json"
+DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "data.json")
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "career_platform.db")
 
 

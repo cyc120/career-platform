@@ -52,16 +52,39 @@ async def load_user_profile(state: JobMatcherState) -> Dict:
 
 
 async def retrieve_candidates(state: JobMatcherState) -> Dict:
-    """RAG: use resume text to find top candidate jobs via vector search."""
+    """RAG: use resume text to find top candidate jobs via vector search.
+
+    Retrieves a larger pool (top_k=200) then deduplicates by job_title,
+    keeping one representative per unique title (the closest vector match).
+    Returns up to 10 unique job title IDs.
+    """
     profile = state.get("user_profile", {})
-    # Build a search query from user profile
     profile_text = json.dumps(profile, ensure_ascii=False)
-    candidate_ids = resume_job_matcher.retrieve_candidates(profile_text, top_k=10)
-    return {"candidate_job_ids": candidate_ids}
+
+    # Widen retrieval to cover more unique titles
+    candidate_ids = resume_job_matcher.retrieve_candidates(profile_text, top_k=200)
+    print(f"[Match] RAG returned {len(candidate_ids)} candidate IDs")
+    if not candidate_ids:
+        return {"candidate_job_ids": []}
+
+    # Deduplicate by job_title — keep the first (best vector match) per title
+    details = await db_utils.get_job_details([int(i) for i in candidate_ids])
+    print(f"[Match] DB returned {len(details)} job details for {len(candidate_ids)} IDs")
+    seen_titles: dict[str, str] = {}
+    for job in details:
+        title = (job.get("job_title") or "").strip()
+        if title and title not in seen_titles:
+            seen_titles[title] = str(job["id"])
+        if len(seen_titles) >= 10:
+            break
+
+    print(f"[Match] After dedup: {len(seen_titles)} unique titles: {list(seen_titles.keys())}")
+    return {"candidate_job_ids": list(seen_titles.values())}
 
 
 async def load_job_details(state: JobMatcherState) -> Dict:
     ids = state.get("candidate_job_ids", [])
+    print(f"[Match] load_job_details: {len(ids)} candidate IDs: {ids[:15]}...")
     if not ids:
         # Fallback: user favorites
         uid = state["user_id"]
@@ -110,6 +133,7 @@ async def algorithmic_match(state: JobMatcherState) -> Dict:
 
     profile = state.get("user_profile", {})
     jobs = state.get("job_details", [])
+    print(f"[Match] algorithmic_match: scoring {len(jobs)} jobs: {[j.get('job_title','?') for j in jobs]}")
 
     if not jobs:
         return {"match_results": []}

@@ -123,6 +123,24 @@ async def get_user_selected_job(user: dict = Depends(get_current_user)):
     return {"success": True, "data": job}
 
 
+@router.delete("/selected-job")
+async def clear_selected_job(user: dict = Depends(get_current_user)):
+    """Clear user's locked job (unlock)."""
+    uid = user["user_id"]
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM user_selected_job WHERE user_id = :uid"),
+            {"uid": uid},
+        )
+        await db.execute(
+            text("DELETE FROM daily_tasks WHERE user_id = :uid"),
+            {"uid": uid},
+        )
+        await db.commit()
+    print(f"[Matching] cleared selected job for user {uid}")
+    return {"success": True, "message": "已取消锁定"}
+
+
 @router.get("/has-matching")
 async def has_matching(user: dict = Depends(get_current_user)):
     """Check if user has any matching data (selected job or match report)."""

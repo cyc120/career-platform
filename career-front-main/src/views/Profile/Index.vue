@@ -214,10 +214,12 @@ const _moduleState = {
 </script>
 
 <script setup>
-import { ref, nextTick, computed, onMounted, onUnmounted, provide } from 'vue'
+import { ref, nextTick, computed, onMounted, onUnmounted, provide, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Upload, Connection, User, TrendCharts, DocumentCopy, Star, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { learningPlanApi } from '@/api/learningPlan'
+import { matchingApi } from '@/api/matching'
 import * as mammoth from 'mammoth'
 
 // 导入你的子组件
@@ -311,6 +313,14 @@ const removeFile = () => {
 }
 
 const activeTab = ref('info')
+
+// 从 URL 同步初始 tab
+const router = useRouter()
+const route = useRoute()
+if (route.path.includes('/profile/match')) activeTab.value = 'match'
+else if (route.path.includes('/profile/growth')) activeTab.value = 'growth'
+else if (route.path.includes('/profile/favorites')) activeTab.value = 'favorite'
+else if (route.path.includes('/profile/report-export')) activeTab.value = 'report-export'
 const loading = ref(false)
 const isStreaming = ref(false)
 const inputValue = ref('')
@@ -380,24 +390,26 @@ const initChatGreeting = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 已有聊天记录则跳过问候
   if (chatMessages.value.length === 0) {
     initChatGreeting()
   }
-  // 检查是否有实际的匹配缓存数据，且用户已填写个人信息（雷达数据不全为0）
+  // 检查后端是否有锁定岗位（而非仅看 sessionStorage 缓存）
   try {
-    const raw = sessionStorage.getItem('job_match_cache')
-    const hasRadarData = currentRadarData.value && currentRadarData.value.some(v => v > 0)
-    if (raw && hasRadarData) {
-      const cached = JSON.parse(raw)
-      hasMatchData.value = cached.results && cached.results.length > 0
-    } else {
-      hasMatchData.value = false
-    }
+    const { data } = await matchingApi.getSelectedJob()
+    hasMatchData.value = !!(data.success && data.data)
   } catch {
     hasMatchData.value = false
   }
+})
+
+// 路由变化时同步 tab（解决从岗位详情返回时 tab 重置的问题）
+watch(() => route.path, (path) => {
+  if (path.includes('/profile/match')) activeTab.value = 'match'
+  else if (path.includes('/profile/growth')) activeTab.value = 'growth'
+  else if (path.includes('/profile/favorites')) activeTab.value = 'favorite'
+  else if (path.includes('/profile/report-export')) activeTab.value = 'report-export'
 })
 
 // 组件销毁前同步状态到模块级变量
@@ -416,6 +428,10 @@ const handleMenuSelect = (index) => {
     return
   }
   activeTab.value = index
+  // 同步 URL，使浏览器后退能回到正确的 tab
+  const pathMap = { info: '/profile/info', match: '/profile/match', growth: '/profile/growth', favorite: '/profile/favorites', 'report-export': '/profile/report-export' }
+  const target = pathMap[index]
+  if (target && route.path !== target) router.replace(target)
 }
 
 // 重新填写：清空对话，重置画像
