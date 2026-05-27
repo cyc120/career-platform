@@ -17,18 +17,22 @@ async def list_jobs(
 ):
     """List jobs with optional keyword filtering. Uses RAG for keyword searches."""
     if keyword:
-        results = job_retriever.search(keyword, top_k=page_size, industry=industry or None, city=city or None)
-        return {
-            "success": True,
-            "jobs": [
-                {"id": int(r.id), "job_title": r.job_title, "company": r.company,
-                 "industry": r.industry, "city": r.city, "salary_range": r.salary_range,
-                 "company_scale": r.metadata.get("company_scale", "") if r.metadata else "",
-                 "score": r.score}
-                for r in results
-            ],
-            "source": "vector",
-        }
+        results = job_retriever.search(keyword, top_k=200, industry=industry or None, city=city or None)
+        # Deduplicate by job_title, keep highest score per title
+        seen = {}
+        for r in results:
+            title = (r.job_title or "").strip()
+            if not title:
+                continue
+            if title not in seen or r.score > seen[title]["score"]:
+                seen[title] = {
+                    "id": int(r.id), "job_title": r.job_title, "company": r.company,
+                    "industry": r.industry, "city": r.city, "salary_range": r.salary_range,
+                    "company_scale": r.metadata.get("company_scale", "") if r.metadata else "",
+                    "score": r.score,
+                }
+        deduped = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
+        return {"success": True, "jobs": deduped[:page_size], "source": "vector"}
 
     offset = (page - 1) * page_size
     query = "SELECT id, job_title, company, industry, city, salary_range, company_scale, publish_date FROM jobs WHERE 1=1"
@@ -49,19 +53,23 @@ async def list_jobs(
 
 
 @router.get("/search")
-async def search_jobs(q: str = Query(""), top_k: int = Query(10)):
-    """Semantic job search via RAG."""
-    results = job_retriever.search(q, top_k=top_k)
-    return {
-        "success": True,
-        "jobs": [
-            {"id": int(r.id), "job_title": r.job_title, "company": r.company,
-             "industry": r.industry, "city": r.city, "salary_range": r.salary_range,
-             "company_scale": r.metadata.get("company_scale", "") if r.metadata else "",
-             "score": r.score}
-            for r in results
-        ],
-    }
+async def search_jobs(q: str = Query(""), top_k: int = Query(50)):
+    """Semantic job search via RAG with title deduplication."""
+    results = job_retriever.search(q, top_k=top_k * 5)  # fetch more for dedup
+    seen = {}
+    for r in results:
+        title = (r.job_title or "").strip()
+        if not title:
+            continue
+        if title not in seen or r.score > seen[title]["score"]:
+            seen[title] = {
+                "id": int(r.id), "job_title": r.job_title, "company": r.company,
+                "industry": r.industry, "city": r.city, "salary_range": r.salary_range,
+                "company_scale": r.metadata.get("company_scale", "") if r.metadata else "",
+                "score": r.score,
+            }
+    deduped = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
+    return {"success": True, "jobs": deduped[:top_k]}
 
 
 @router.get("/hot")
