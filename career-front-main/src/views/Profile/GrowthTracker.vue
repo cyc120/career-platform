@@ -1276,7 +1276,8 @@ watch(isCoachingOpen, (open) => {
 
 /* 加载状态 - 与人岗匹配风格一致 */
 .loading-section {
-  min-height: 90vh;
+  height: 90vh;
+  min-height: 600px;
   border-radius: 20px;
   overflow: hidden;
 }

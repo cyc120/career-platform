@@ -119,23 +119,39 @@ const orbs = reactive(
   }))
 )
 
-// Canvas 粒子初始化
+// Canvas 粒子初始化（自适应容器尺寸 + 设备像素比）
+let containerW = 0
+let containerH = 0
+
 const initCanvas = () => {
   if (!canvasRef.value || !containerRef.value) return
   const rect = containerRef.value.getBoundingClientRect()
-  canvasRef.value.width = rect.width
-  canvasRef.value.height = rect.height
+  const dpr = window.devicePixelRatio || 1
+  containerW = rect.width
+  containerH = rect.height
+  canvasRef.value.width = containerW * dpr
+  canvasRef.value.height = containerH * dpr
+  canvasRef.value.style.width = containerW + 'px'
+  canvasRef.value.style.height = containerH + 'px'
   canvasCtx = canvasRef.value.getContext('2d')
+  canvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-  particles = []
-  for (let i = 0; i < 80; i++) {
-    particles.push({
-      x: Math.random() * rect.width,
-      y: Math.random() * rect.height,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      size: Math.random() * 2 + 1,
-      color: Math.random() > 0.5 ? 'rgba(80, 152, 249, 0.3)' : 'rgba(118, 75, 162, 0.3)',
+  // 重新分配粒子位置（保留已有粒子则只调整越界的）
+  if (particles.length === 0) {
+    for (let i = 0; i < 80; i++) {
+      particles.push({
+        x: Math.random() * containerW,
+        y: Math.random() * containerH,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        size: Math.random() * 2 + 1,
+        color: Math.random() > 0.5 ? 'rgba(80, 152, 249, 0.3)' : 'rgba(118, 75, 162, 0.3)',
+      })
+    }
+  } else {
+    particles.forEach(p => {
+      if (p.x > containerW) p.x = Math.random() * containerW
+      if (p.y > containerH) p.y = Math.random() * containerH
     })
   }
 }
@@ -143,9 +159,12 @@ const initCanvas = () => {
 // 主渲染循环
 const renderLoop = () => {
   if (!canvasCtx || !canvasRef.value || !containerRef.value) return
-  const rect = containerRef.value.getBoundingClientRect()
-  const w = rect.width
-  const h = rect.height
+  const w = containerW
+  const h = containerH
+  if (w === 0 || h === 0) {
+    animationFrameId = requestAnimationFrame(renderLoop)
+    return
+  }
 
   canvasCtx.clearRect(0, 0, w, h)
 
@@ -242,20 +261,29 @@ const handleMouseLeave = () => {
   mouse.y = -1000
 }
 
-// 窗口大小变化
-const handleResize = () => {
-  initCanvas()
-}
+// 容器尺寸变化（ResizeObserver 比 window.resize 更准确）
+let resizeObserver = null
 
 onMounted(() => {
   initCanvas()
   renderLoop()
-  window.addEventListener('resize', handleResize)
+  if (containerRef.value && window.ResizeObserver) {
+    resizeObserver = new ResizeObserver(() => {
+      initCanvas()
+    })
+    resizeObserver.observe(containerRef.value)
+  } else {
+    window.addEventListener('resize', initCanvas)
+  }
 })
 
 onUnmounted(() => {
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
-  window.removeEventListener('resize', handleResize)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+  } else {
+    window.removeEventListener('resize', initCanvas)
+  }
 })
 </script>
 
@@ -263,7 +291,8 @@ onUnmounted(() => {
 .interactive-loading {
   position: relative;
   width: 100%;
-  min-height: 70vh;
+  height: 100%;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;

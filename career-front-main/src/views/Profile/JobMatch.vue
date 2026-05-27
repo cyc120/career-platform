@@ -673,7 +673,8 @@ watch(currentRadarData, (newVal, oldVal) => {
 
 /* 加载状态 - 使用 InteractiveLoading 组件 */
 .loading-section {
-  min-height: 70vh;
+  height: 70vh;
+  min-height: 500px;
   border-radius: 20px;
   overflow: hidden;
 }
