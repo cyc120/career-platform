@@ -44,8 +44,9 @@ def process_file(state: ResumeAnalyzerState) -> Dict:
         elif ext in (".txt", ".md"):
             with open(path, "r", encoding="utf-8") as f:
                 text = f.read()
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"文件解析失败 [{ext}]: {e}")
     return {"file_text": text}
 
 

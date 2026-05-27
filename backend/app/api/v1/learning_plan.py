@@ -101,6 +101,17 @@ async def parse_file(req: ParseFileRequest, user: dict = Depends(get_current_use
         except Exception as e:
             raise HTTPException(400, f"PDF 解析失败: {str(e)}")
 
+    if ext == 'docx':
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(file_bytes))
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            return {"success": True, "text": text}
+        except ImportError:
+            raise HTTPException(500, "python-docx not installed")
+        except Exception as e:
+            raise HTTPException(400, f"DOCX 解析失败: {str(e)}")
+
     if ext == 'doc':
         return {"success": False, "error": "暂不支持 .doc 格式，请转换为 .docx 后重新上传"}
 

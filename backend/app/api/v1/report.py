@@ -117,6 +117,9 @@ async def export_report(req: ExportRequest, user: dict = Depends(get_current_use
                 "C:/Windows/Fonts/simsun.ttc",
                 "C:/Windows/Fonts/msyh.ttc",
                 "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/System/Library/Fonts/STHeiti Medium.ttc",
+                "/System/Library/Fonts/PingFang.ttc",
+                "/Library/Fonts/Arial Unicode.ttf",
             ]:
                 if os.path.exists(font_path):
                     try:
