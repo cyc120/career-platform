@@ -93,18 +93,21 @@ def main():
         salary_range = annual_to_monthly_salary(min_sal, max_sal)
         company_scale = (item.get("company_scale") or "").strip()
         job_details = item.get("job_details") or ""
+        company_desc = (item.get("company_description") or "").strip()
         description, requirements = extract_job_fields(job_details)
 
         batch.append((
             title, company, industry, city, salary_range,
-            description, requirements, company_scale
+            description, requirements, company_scale,
+            company_desc, job_details
         ))
 
         if len(batch) >= batch_size:
             cur.executemany(
                 """INSERT INTO jobs (job_title, company, industry, city, salary_range,
-                   job_description, requirements, publish_date, company_scale)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), ?)""",
+                   job_description, requirements, publish_date, company_scale,
+                   company_description, job_details)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), ?, ?, ?)""",
                 batch
             )
             batch = []
@@ -113,8 +116,9 @@ def main():
     if batch:
         cur.executemany(
             """INSERT INTO jobs (job_title, company, industry, city, salary_range,
-               job_description, requirements, publish_date, company_scale)
-               VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), ?)""",
+               job_description, requirements, publish_date, company_scale,
+               company_description, job_details)
+               VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), ?, ?, ?)""",
             batch
         )
 

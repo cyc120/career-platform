@@ -50,7 +50,16 @@
           </el-empty>
         </div>
         <div v-else class="description">
-          <p>{{ formatDescription(job.description) || '暂无详细描述' }}</p>
+          <div v-if="job.jobDetails" class="job-details-section">
+            <pre class="details-pre">{{ job.jobDetails }}</pre>
+          </div>
+          <div v-else>
+            <p>{{ formatDescription(job.description) || '暂无详细描述' }}</p>
+          </div>
+          <div v-if="job.companyDescription" class="company-desc-section">
+            <h4 class="section-subtitle">公司介绍</h4>
+            <pre class="details-pre">{{ job.companyDescription }}</pre>
+          </div>
           <img src="@/assets/3D programmer.png" class="card-decoration" />
         </div>
       </el-card>
@@ -108,6 +117,8 @@ onMounted(async () => {
         salary: item.salary_range || item.salary || '面议',
         city: item.city || item.location || '--',
         description: item.job_description || item.description || '暂无描述',
+        companyDescription: item.company_description || '',
+        jobDetails: item.job_details || '',
       }
     }
   } catch {
@@ -471,6 +482,33 @@ const toggleFavorite = async () => {
     white-space: pre-wrap;
     margin: 0;
   }
+}
+
+.job-details-section {
+  margin-bottom: 20px;
+}
+
+.company-desc-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed #e0e0e0;
+}
+
+.section-subtitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 10px 0;
+}
+
+.details-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #555;
 }
 
 /* 3. 图片的绝对定位样式 */

@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     company_scale VARCHAR(50),
     job_description TEXT,
     requirements TEXT,
+    company_description TEXT,
+    job_details TEXT,
     publish_date DATE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
