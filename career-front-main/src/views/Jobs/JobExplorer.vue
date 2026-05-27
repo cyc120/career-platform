@@ -8,7 +8,7 @@
           :prefix-icon="Search"
           size="large"
           class="custom-search"
-          @input="handleSearch" 
+          @input="debounceSearch"
         />
         <el-button type="primary" size="large" class="search-btn" @click="handleSearch">搜索</el-button>
       </div>
@@ -141,11 +141,11 @@ const selectedTags = ref([])
 const hoveredJob = ref(null)
 const allJobs = ref([])
 const currentPage = ref(1)
+let searchTimer = null
 
 const loadJobs = async (reset = true) => {
   try {
     const params = {}
-    // Build API params: only industry and city go to backend
     selectedTags.value.forEach((tag) => {
       if (tag.type === 'industry' || tag.type === 'city') {
         params[tag.type] = tag.value
@@ -154,7 +154,8 @@ const loadJobs = async (reset = true) => {
 
     let data
     if (searchQuery.value) {
-      const resp = await jobsApi.search(searchQuery.value, params)
+      // Use list endpoint with keyword — supports RAG search + industry/city filters
+      const resp = await jobsApi.list({ ...params, keyword: searchQuery.value, page: 1, page_size: 200 })
       data = resp.data
     } else {
       const resp = await jobsApi.list({ ...params, page: currentPage.value, page_size: 200 })
@@ -201,15 +202,7 @@ const salaryFilteredJobs = computed(() => {
 })
 
 const filteredJobs = computed(() => {
-  let result = salaryFilteredJobs.value
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(j =>
-      (j.title && j.title.toLowerCase().includes(q)) ||
-      (j.company && j.company.toLowerCase().includes(q))
-    )
-  }
-  return result
+  return salaryFilteredJobs.value
 })
 
 const displayedJobs = computed(() => {
@@ -232,6 +225,15 @@ const handleSearch = () => {
   count.value = 20
   currentPage.value = 1
   loadJobs()
+}
+
+const debounceSearch = () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    count.value = 20
+    currentPage.value = 1
+    loadJobs()
+  }, 300)
 }
 
 // --- Filter functions ---
