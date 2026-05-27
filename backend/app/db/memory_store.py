@@ -1,4 +1,4 @@
-"""In-memory drop-in replacement for Redis when running without Docker.
+"""In-memory drop-in replacement for Redis when Redis is unavailable.
 
 Provides the same async function signatures as redis.py using Python dicts.
 """

@@ -13,8 +13,8 @@
 | LLM | DeepSeek (deepseek-chat) / 通义千问 (qwen-plus) |
 | 向量检索 | ChromaDB + BGE-small-zh 嵌入模型 |
 | 知识图谱 | Neo4j 5 |
-| 数据库 | SQLite（本地开发）/ MySQL 8.0（Docker 部署）|
-| 缓存/队列 | Redis 7（Docker）/ 内存字典（本地开发）|
+| 数据库 | SQLite（本地开发）/ MySQL 8.0 |
+| 缓存/队列 | Redis 7 / 内存字典（降级方案）|
 | 异步任务 | ARQ (Redis Queue) |
 
 ---
@@ -97,7 +97,7 @@
 
 ## 快速开始
 
-### 方式一：本地开发（SQLite + 内存缓存，无需 Docker）
+### 本地开发（SQLite + 内存缓存）
 
 #### 1. 后端
 
@@ -156,42 +156,6 @@ Vite 开发代理自动将 `/api` 请求转发到 `http://localhost:8000`。
 | `testuser` | `password123` |
 
 首次访问时，前端会自动获取 Guest Token，也可手动注册新账号。
-
----
-
-### 方式二：Docker Compose 全栈部署
-
-#### 1. 配置环境变量
-
-```bash
-cd backend
-cp .env.example .env
-# 编辑 .env，关键修改：
-#   DB_BACKEND=mysql
-#   MYSQL_HOST=backend-mysql
-#   MYSQL_PASSWORD=root
-#   REDIS_URL=redis://backend-redis:6379/0
-#   NEO4J_URI=bolt://backend-neo4j:7687
-```
-
-#### 2. 启动
-
-```bash
-docker compose up -d
-```
-
-启动 6 个容器：
-
-| 容器 | 端口 | 说明 |
-|------|------|------|
-| `backend-mysql` | 3306 | MySQL 8.0 数据库 |
-| `backend-neo4j` | 7474 / 7687 | Neo4j 知识图谱 |
-| `backend-redis` | 6379 | Redis 缓存/队列 |
-| `career-backend` | 8000 | FastAPI 后端 |
-| `arq-worker` | - | 异步智能体任务 |
-| `career-frontend` | 80 | Nginx 静态前端 |
-
-访问 http://localhost 即可使用。
 
 ---
 
@@ -364,7 +328,6 @@ career-platform/
 │   ├── scripts/
 │   │   └── init_db.sql               # 数据库初始化脚本
 │   ├── requirements.txt              # Python 依赖
-│   ├── docker-compose.yml            # Docker 编排
 │   └── .env.example                  # 环境变量模板
 │
 ├── career-front-main/                # Vue 3 前端

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "deepseek-chat"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-ada-002"
 
-    # Database backend: "sqlite" (local) or "mysql" (Docker)
+    # Database backend: "sqlite" (local) or "mysql"
     DB_BACKEND: str = "sqlite"
 
     # MySQL (only used when DB_BACKEND="mysql")
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     REDIS_RATE_LIMIT: int = 60
 
     # ChromaDB
-    CHROMA_PERSIST_DIR: str = "/app/chroma_data"
+    CHROMA_PERSIST_DIR: str = "./chroma_data"
     CHROMA_COLLECTION_JOBS: str = "job_descriptions"
     CHROMA_COLLECTION_LEARNING: str = "learning_resources"
 
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     AGENT_ASYNC_WORKERS: int = 4
 
     # Upload
-    UPLOAD_DIR: str = "/app/uploads"
+    UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 16
 
     model_config = {"env_file": ".env", "extra": "ignore"}
