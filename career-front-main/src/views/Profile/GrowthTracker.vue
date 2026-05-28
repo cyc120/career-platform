@@ -21,25 +21,28 @@
           <el-icon class="pulse-icon"><MagicStick /></el-icon>
         </div>
         <div class="agent-message">
-          <span class="agent-name">Career Pilot (AI)</span>
+          <div class="agent-header-row">
+            <span class="agent-name">Career Pilot</span>
+            <el-tag v-if="targetPosition" size="small" effect="plain" type="primary">{{ targetPosition }}</el-tag>
+          </div>
           <p class="message-text">{{ aiAnalysis }}</p>
         </div>
       </div>
-      <div class="quick-stats" v-if="growthRate !== '--' || consecutiveDays > 0">
+      <div class="quick-stats" v-if="growthRate !== '--' || pathSteps.length > 0">
         <div class="stat-item">
           <span class="label">成长速度</span>
           <span class="value">{{ growthRate }}</span>
         </div>
         <el-divider direction="vertical" />
         <div class="stat-item">
-          <span class="label">打卡周期</span>
-          <span class="value">{{ consecutiveDays }}天</span>
+          <span class="label">学习阶段</span>
+          <span class="value">{{ pathSteps.length }}阶段</span>
         </div>
       </div>
     </div>
 
     <el-row :gutter="20" class="main-tracking-row equal-height">
-      <el-col :span="15">
+      <el-col :xs="24" :md="14" :lg="15">
         <el-card class="glass-card chart-card">
           <template #header>
             <div class="card-header">
@@ -58,7 +61,7 @@
         </el-card>
       </el-col>
 
-      <el-col :span="9">
+      <el-col :xs="24" :md="10" :lg="9">
         <el-card class="glass-card path-card">
           <template #header>
             <div class="card-header">
@@ -68,9 +71,17 @@
           <div class="path-steps" v-loading="pageLoading && pathSteps.length === 0">
             <el-empty v-if="!hasLearningPlan && pathSteps.length === 0" description="请先完成人岗匹配后生成职业路径" :image-size="60" />
             <el-steps v-else-if="pathSteps.length > 0" direction="vertical" :active="currentPhaseIndex" finish-status="success">
-              <el-step v-for="(step, idx) in pathSteps" :key="idx"
-                :title="step.phase_name || step.title"
-                :description="step.goals ? step.goals.slice(0, 2).join('；') : step.description || ''" />
+              <el-step v-for="(step, idx) in pathSteps" :key="idx">
+                <template #title>
+                  <div class="step-title-row">
+                    <span>{{ step.phase_name || step.title }}</span>
+                    <el-tag v-if="step.duration" size="small" effect="plain" type="info">{{ step.duration }}</el-tag>
+                  </div>
+                </template>
+                <template #description>
+                  <div class="step-desc">{{ step.goals ? step.goals.slice(0, 2).join('；') : step.description || '' }}</div>
+                </template>
+              </el-step>
             </el-steps>
           </div>
         </el-card>
@@ -189,8 +200,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, reactive, watch, inject } from 'vue'
-import { MagicStick, TrendCharts, Compass, Checked, Promotion, Close, Timer, StarFilled, Check } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { MagicStick, TrendCharts, Compass, Checked, Promotion, Close, Timer, StarFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { learningPlanApi } from '@/api/learningPlan'
 import { matchingApi } from '@/api/matching'
@@ -216,7 +226,7 @@ const loadFromCache = () => {
 
 const saveToCache = (cacheKey, data) => {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ cacheKey, ...data, timestamp: Date.now() }))
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ cacheKey, ...data, matchVersion: matchVersion.value, timestamp: Date.now() }))
   } catch { /* quota exceeded, ignore */ }
 }
 
@@ -278,7 +288,6 @@ const selectedJob = inject('selectedJob', ref(null))
 // --- 响应式数据和逻辑 ---
 const aiAnalysis = ref('正在加载学习计划...')
 const targetPosition = ref('')
-const consecutiveDays = ref(0)
 const growthRate = ref('--')
 const currentPhaseIndex = ref(0)
 const pathSteps = ref([])
@@ -295,18 +304,17 @@ const todoList = ref([])
 const pageLoading = ref(true)
 
 // 加载动画状态
-const loadingText = ref('AI 正在分析你的职业画像...')
 const currentLoadingStep = ref(0)
 const loadingProgress = ref(0)
 const loadingSteps = ['获取岗位信息', '分析能力模型', '生成学习计划', '规划每日任务']
 let loadingTimer = null
 let progressTimer = null
 
-// 验证缓存是否有效
+// 验证缓存是否有效（需同时匹配画像+岗位 和 匹配版本）
 const isCacheValid = (cacheKey) => {
   const cached = loadFromCache()
   if (!cached || !cached.cacheKey) return false
-  return cached.cacheKey === cacheKey
+  return cached.cacheKey === cacheKey && cached.matchVersion === matchVersion.value
 }
 
 // 从缓存恢复数据
@@ -331,32 +339,37 @@ const restoreFromCache = () => {
 }
 
 // 获取所有数据并保存到缓存
-const fetchAllDataAndCache = async (cacheKey) => {
+const fetchAllDataAndCache = async (cacheKey, forceRefresh = false) => {
   startLoadingAnimation()
-  // 必须先生成学习计划，再获取每日任务（任务依赖计划存在）
-  await fetchLearningPlan()
-  await Promise.all([fetchDailyTasks(), fetchCapabilityModel()])
-  stopLoadingAnimation()
+  try {
+    // 必须先生成学习计划，再获取每日任务（任务依赖计划存在）
+    await fetchLearningPlan(forceRefresh)
+    await Promise.all([fetchDailyTasks(), fetchCapabilityModel()])
 
-  // 保存到缓存
-  saveToCache(cacheKey, {
-    targetPosition: targetPosition.value,
-    aiAnalysis: aiAnalysis.value,
-    growthRate: growthRate.value,
-    pathSteps: pathSteps.value,
-    todoList: todoList.value,
-    currentLevelData: currentLevelData.value,
-    targetLevelData: targetLevelData.value,
-    radarIndicators: radarIndicators.value,
-    hasCapabilityData: hasCapabilityData.value,
-  })
+    // 保存到缓存
+    saveToCache(cacheKey, {
+      targetPosition: targetPosition.value,
+      aiAnalysis: aiAnalysis.value,
+      growthRate: growthRate.value,
+      pathSteps: pathSteps.value,
+      todoList: todoList.value,
+      currentLevelData: currentLevelData.value,
+      targetLevelData: targetLevelData.value,
+      radarIndicators: radarIndicators.value,
+      hasCapabilityData: hasCapabilityData.value,
+    })
+  } catch (err) {
+    console.error('[GrowthTracker] fetchAllDataAndCache error:', err)
+    aiAnalysis.value = '数据加载失败，请返回人岗匹配重新锁定岗位后再试'
+  } finally {
+    stopLoadingAnimation()
+  }
 }
 
 // 调用 learning_plan agent
-const fetchLearningPlan = async () => {
+const fetchLearningPlan = async (forceRefresh = false) => {
   try {
-    // 加入时间戳避免浏览器缓存
-    const { data } = await learningPlanApi.generate({ plan_type: '长期', _t: Date.now() })
+    const { data } = await learningPlanApi.generate({ plan_type: '长期', force_refresh: forceRefresh })
     console.log('[GrowthTracker] fetchLearningPlan response:', data.learning_plan?.target_job)
     if (data.learning_plan) {
       const plan = data.learning_plan
@@ -512,18 +525,13 @@ const handleResize = () => radarInstance?.resize()
 const startLoadingAnimation = () => {
   currentLoadingStep.value = 0
   loadingProgress.value = 0
-  loadingText.value = 'AI 正在分析你的职业画像...'
 
-  // 模拟步骤进度
-  const stepTexts = ['正在获取岗位信息...', '正在分析能力模型...', '正在生成学习计划...', '正在规划每日任务...']
   loadingTimer = setInterval(() => {
     if (currentLoadingStep.value < loadingSteps.length - 1) {
       currentLoadingStep.value++
-      loadingText.value = stepTexts[currentLoadingStep.value] || '加载中...'
     }
   }, 800)
 
-  // 平滑进度条
   progressTimer = setInterval(() => {
     if (loadingProgress.value < 90) {
       loadingProgress.value += Math.random() * 15
@@ -534,24 +542,20 @@ const startLoadingAnimation = () => {
 const stopLoadingAnimation = async () => {
   loadingProgress.value = 100
   currentLoadingStep.value = loadingSteps.length
-  loadingText.value = '加载完成！'
   clearInterval(loadingTimer)
   clearInterval(progressTimer)
-  setTimeout(async () => {
-    pageLoading.value = false
-    await nextTick()
-    setTimeout(() => {
-      initRadarChart()
-      window.addEventListener('resize', handleResize)
-    }, 200)
-  }, 300)
+  pageLoading.value = false
+  await nextTick()
+  initRadarChart()
+  window.addEventListener('resize', handleResize)
 }
 
 // 生命周期
 onMounted(async () => {
-  // 没有匹配数据时直接显示空状态，不调用API
-  if (!hasMatchData.value) {
-    aiAnalysis.value = '请先完成人岗匹配，我将为你生成个性化学习计划'
+  // 没有个人信息或没有匹配数据时直接显示空状态，不调用API
+  const hasProfile = currentRadarData.value && currentRadarData.value.some(v => v > 0)
+  if (!hasProfile || !hasMatchData.value) {
+    aiAnalysis.value = '请先完善个人信息并完成人岗匹配，我将为你生成个性化学习计划'
     pageLoading.value = false
     return
   }
@@ -562,14 +566,11 @@ onMounted(async () => {
 
   // 检查缓存是否有效
   if (isCacheValid(cacheKey)) {
-    // 从缓存恢复数据
     restoreFromCache()
     pageLoading.value = false
     await nextTick()
-    setTimeout(() => {
-      initRadarChart()
-      window.addEventListener('resize', handleResize)
-    }, 200)
+    initRadarChart()
+    window.addEventListener('resize', handleResize)
     return
   }
 
@@ -589,9 +590,7 @@ watch(hasMatchData, async (newVal) => {
     restoreFromCache()
     pageLoading.value = false
     await nextTick()
-    setTimeout(() => {
-      initRadarChart()
-    }, 200)
+    initRadarChart()
     return
   }
 
@@ -600,6 +599,9 @@ watch(hasMatchData, async (newVal) => {
 
 // 监听重新匹配事件，清除缓存并重新加载
 watch(matchVersion, async () => {
+  // 清除缓存，确保拿到最新数据
+  sessionStorage.removeItem(CACHE_KEY)
+
   // 重置状态
   hasLearningPlan.value = false
   hasCapabilityData.value = false
@@ -614,7 +616,18 @@ watch(matchVersion, async () => {
 
   pageLoading.value = true
 
-  // 等待匹配完成后加载数据（通过 hasMatchData watcher）
+  // 没有个人信息或匹配数据时不请求
+  const hasProfile = currentRadarData.value && currentRadarData.value.some(v => v > 0)
+  if (!hasProfile || !hasMatchData.value) {
+    aiAnalysis.value = '请先完善个人信息并完成人岗匹配，我将为你生成个性化学习计划'
+    pageLoading.value = false
+    return
+  }
+
+  // 直接重新获取数据，不依赖 hasMatchData watcher（hasMatchData 可能一直为 true 不触发）
+  const jobTitle = selectedJob.value?.job_title || ''
+  const cacheKey = generateCacheKey(currentRadarData.value, jobTitle)
+  await fetchAllDataAndCache(cacheKey, true)
 })
 
 // 监听锁定岗位变化，切换岗位时刷新数据
@@ -642,16 +655,14 @@ watch(selectedJob, async (newJob, oldJob) => {
   pageLoading.value = true
 
   const cacheKey = generateCacheKey(currentRadarData.value, newJob.job_title)
-  await fetchAllDataAndCache(cacheKey)
+  await fetchAllDataAndCache(cacheKey, true)
 })
 
-// 能力数据就绪后初始化雷达图（兜底，防止 stopLoadingAnimation 时序问题）
+// 能力数据就绪后初始化雷达图
 watch(hasCapabilityData, async (ready) => {
   if (ready && !pageLoading.value) {
     await nextTick()
-    setTimeout(() => {
-      if (!radarInstance && radarChartRef.value) initRadarChart()
-    }, 100)
+    if (!radarInstance && radarChartRef.value) initRadarChart()
   }
 })
 
@@ -676,10 +687,6 @@ const isCoachingLoading = ref(false)
 const chatHistory = ref([]) // [{role: "user"|"assistant", content: str}]
 const chatMessagesRef = ref(null)
 const coachGreeted = ref(false)
-
-const toggleCoaching = () => {
-  isCoachingOpen.value = !isCoachingOpen.value
-}
 
 const scrollChatToBottom = () => {
   nextTick(() => {
@@ -796,8 +803,9 @@ watch(isCoachingOpen, (open) => {
     
     .agent-info {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 15px;
+      flex: 1;
       .agent-avatar {
         width: 45px; height: 45px;
         background: #70a1ff;
@@ -807,30 +815,44 @@ watch(isCoachingOpen, (open) => {
         justify-content: center;
         color: white;
         font-size: 24px;
+        flex-shrink: 0;
         .pulse-icon { animation: pulse 2s infinite; }
       }
-      .agent-name { font-size: 12px; color: #70a1ff; font-weight: bold; }
-      .message-text { margin: 0; font-size: 14px; color: #475569; }
+      .agent-message {
+        flex: 1;
+        min-width: 0;
+        .agent-header-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 6px;
+        }
+        .agent-name { font-size: 14px; color: #1e293b; font-weight: 700; }
+        .message-text { margin: 0; font-size: 13px; color: #64748b; line-height: 1.5; }
+      }
     }
     
     .quick-stats {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 24px;
+      flex-shrink: 0;
       .stat-item {
-        text-align: right;
-        .label { font-size: 12px; color: #94a3b8; display: block; }
-        .value { font-size: 18px; font-weight: bold; color: #70a1ff; }
+        text-align: center;
+        .label { font-size: 11px; color: #94a3b8; display: block; margin-bottom: 2px; }
+        .value { font-size: 20px; font-weight: 800; color: #70a1ff; }
       }
+      .el-divider--vertical { height: 30px; }
     }
   }
 
   .chart-wrapper {
-    height: 380px;
+    flex: 1;
+    min-height: 300px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    .radar-chart { width: 100%; height: 320px; }
+    .radar-chart { width: 100%; flex: 1; min-height: 250px; }
     .chart-legend {
       display: flex;
       gap: 20px;
@@ -846,28 +868,25 @@ watch(isCoachingOpen, (open) => {
     }
   }
 
-  .path-steps { padding: 20px 10px; height: 380px; }
+  .path-steps {
+    padding: 10px 8px;
+    flex: 1;
+    overflow-y: auto;
 
-  .todo-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 15px;
-    padding: 10px 0;
-    
-    .todo-item-card {
-      background: rgba(255, 255, 255, 0.4);
-      padding: 15px;
-      border-radius: 12px;
+    .step-title-row {
       display: flex;
       align-items: center;
-      gap: 12px;
-      transition: all 0.3s;
-      border: 1px solid transparent;
-      
-      &:hover { border-color: #70a1ff; background: white; }
-      &.is-completed { opacity: 0.6; .todo-text { text-decoration: line-through; } }
-      .todo-info { display: flex; flex-direction: column; gap: 4px; .todo-text { font-size: 14px; color: #334155; } .ai-tag { width: fit-content; border: none; } }
+      gap: 8px;
+      font-size: 14px;
     }
+
+    .step-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    :deep(.el-step__title.is-process) { color: #70a1ff; font-weight: 700; }
   }
 
   /* 原有呼吸和 fadeIn 动画保留 */
@@ -1118,16 +1137,6 @@ watch(isCoachingOpen, (open) => {
   }
 }
     }
-
-    /* 删掉原本的 dialog-footer 样式，因为按钮已移入 input-area */
-
-    .dialog-footer {
-      padding: 16px 24px;
-      border-top: 1px solid #f1f5f9;
-      display: flex;
-      justify-content: flex-end;
-      .el-button { padding: 12px 24px; border-radius: 12px; }
-    }
   }
 
   /* 3. 激活状态 */
@@ -1137,40 +1146,41 @@ watch(isCoachingOpen, (open) => {
     transform: scale(1);
   }
 
-  /* 4. 遮罩层 */
-  .dialog-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: rgba(15, 23, 42, 0.3);
-    backdrop-filter: blur(4px);
-    z-index: 2050;
-  }
 }
 
 .equal-height {
   display: flex;
-  align-items: stretch; /* 确保子项（el-col）高度一致 */
+  align-items: stretch;
   margin-bottom: 20px !important;
 
   :deep(.el-col) {
     display: flex;
     flex-direction: column;
+    margin-bottom: 0;
   }
 
-  /* 强制卡片撑满 col 高度 */
   .glass-card {
     flex: 1;
     display: flex;
     flex-direction: column;
-    margin-bottom: 0; /* 移除间距防止溢出 */
+    margin-bottom: 0;
   }
 
-  /* 确保卡片内容区自动填充剩余空间 */
   :deep(.el-card__body) {
     flex: 1;
     display: flex;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .equal-height {
+    flex-direction: column;
+    :deep(.el-col) { margin-bottom: 20px; }
+  }
+  .agent-command-bar {
+    flex-direction: column;
+    gap: 16px;
   }
 }
 
@@ -1274,10 +1284,10 @@ watch(isCoachingOpen, (open) => {
   border: 1px solid rgba(255, 186, 116, 0.2) !important;
 }
 
-/* 加载状态 - 与人岗匹配风格一致 */
+/* 加载状态 - 自适应容器大小 */
 .loading-section {
-  height: 90vh;
-  min-height: 600px;
+  flex: 1;
+  min-height: 400px;
   border-radius: 20px;
   overflow: hidden;
 }

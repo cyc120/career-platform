@@ -14,11 +14,11 @@
         <span>人岗匹配</span>
       </el-menu-item>
       <el-tooltip
-        :disabled="hasMatchData"
-        content="请先完成人岗匹配后再使用"
+        :disabled="canAccessGrowth"
+        content="请先完善个人信息并完成人岗匹配后再使用"
         placement="right"
       >
-        <el-menu-item index="growth" :disabled="!hasMatchData" :class="{ 'is-disabled-custom': !hasMatchData }">
+        <el-menu-item index="growth" :disabled="!canAccessGrowth" :class="{ 'is-disabled-custom': !canAccessGrowth }">
           <el-icon><TrendCharts /></el-icon>
           <span>成长追踪中心</span>
         </el-menu-item>
@@ -122,9 +122,12 @@
               </section>
 
               <section class="dashboard-preview-section">
-                <div class="artifact-card">
+                <div class="artifact-card preview-glass-card">
                   <div class="artifact-header">
-                    <h4>实时画像预览</h4>
+                    <div class="preview-title-group">
+                      <span class="preview-kicker">Profile Live</span>
+                      <h4>实时画像预览</h4>
+                    </div>
                     <div class="completion-status">
                       <span class="percentage">
                         {{ completionLabel }}
@@ -132,9 +135,14 @@
                       <span class="label">维度完善度 ({{ analyzedCount }}/7)</span>
                     </div>
                   </div>
+
+                  <div class="completion-track" aria-hidden="true">
+                    <span :style="{ width: `${Math.round((analyzedCount / 7) * 100)}%` }"></span>
+                  </div>
                   
                   <div class="scroll-container">
-                    <div class="preview-radar-placeholder">
+                    <div class="preview-radar-placeholder radar-glass">
+                      <div class="radar-halo"></div>
                       <RadarChart :data="currentRadarData" />
                     </div>
 
@@ -183,10 +191,10 @@
         <div v-else-if="activeTab === 'match'" class="sub-page">
           <JobMatch />
         </div>
-        <div v-else-if="activeTab === 'growth' && hasMatchData" class="sub-page">
+        <div v-else-if="activeTab === 'growth' && canAccessGrowth" class="sub-page">
           <GrowthTracker :key="selectedJob?.job_title || 'default'" />
         </div>
-        <div v-else-if="activeTab === 'growth' && !hasMatchData" class="sub-page">
+        <div v-else-if="activeTab === 'growth' && !canAccessGrowth" class="sub-page">
           <div class="empty-state">
             <el-empty description="请先完成人岗匹配后再使用成长追踪中心" />
           </div>
@@ -340,6 +348,12 @@ provide('hasMatchData', hasMatchData)
 const selectedJob = ref(null)
 provide('selectedJob', selectedJob)
 
+// 是否可访问成长追踪中心：必须有个人信息 + 已匹配岗位
+const canAccessGrowth = computed(() => {
+  const hasProfile = currentRadarData.value && currentRadarData.value.some(v => v > 0)
+  return hasProfile && hasMatchData.value
+})
+
 // --- 聊天状态（使用模块级数据，SPA 内切换保留） ---
 const currentStepIndex = ref(_moduleState.currentStepIndex)
 const chatMessages = ref(_moduleState.chatMessages)
@@ -404,8 +418,10 @@ onMounted(async () => {
   try {
     const { data } = await matchingApi.getSelectedJob()
     hasMatchData.value = !!(data.success && data.data)
+    selectedJob.value = data.success && data.data ? data.data : null
   } catch {
     hasMatchData.value = false
+    selectedJob.value = null
   }
 })
 
@@ -427,9 +443,9 @@ onUnmounted(() => {
 
 // 🌟 修复核心：确保菜单选择逻辑能干净地切换 activeTab
 const handleMenuSelect = (index) => {
-  // 人岗匹配未完成时，禁止切换到成长追踪中心
-  if (index === 'growth' && !hasMatchData.value) {
-    ElMessage.warning('请先完成人岗匹配后再使用成长追踪中心')
+  // 未完成人岗匹配或无个人信息时，禁止切换到成长追踪中心
+  if (index === 'growth' && !canAccessGrowth.value) {
+    ElMessage.warning('请先完善个人信息并完成人岗匹配后再使用成长追踪中心')
     return
   }
   activeTab.value = index
@@ -457,6 +473,15 @@ const handleReset = () => {
   _moduleState.chatMessages = []
   _moduleState.chatGreeted = false
   _moduleState.currentStepIndex = 0
+
+  // 清除匹配状态：没有画像就不该有岗位匹配
+  hasMatchData.value = false
+  selectedJob.value = null
+  matchingApi.clearSelectedJob().catch(() => {})
+
+  // 清除所有相关缓存
+  sessionStorage.removeItem('job_match_cache')
+  sessionStorage.removeItem('growth_tracker_cache')
 
   // 重新发起问候
   initChatGreeting()
@@ -603,6 +628,9 @@ const completionLabel = computed(() => {
 .sidebar {
   width: 240px;
   height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
   background: linear-gradient(180deg, rgba(249, 249, 249, 0.445) 0%, rgba(218, 234, 251, 0.586) 50%, rgba(255, 255, 255, 0.3) 100%);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
@@ -851,6 +879,8 @@ const completionLabel = computed(() => {
 /* 增强主内容区的呼吸感 */
 .main-content {
   flex: 1;
+  margin-left: 240px;
+  min-width: 0;
   padding: 24px;
   background: transparent;
   overflow-y: auto;
@@ -1430,6 +1460,232 @@ const completionLabel = computed(() => {
   -webkit-backdrop-filter: blur(16px) saturate(1.1);
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* 实时画像预览升级 */
+.dashboard-preview-section {
+  .preview-glass-card {
+    position: relative;
+    min-width: 0;
+    padding: 22px;
+    border-radius: 28px;
+    overflow: hidden;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.66), rgba(246, 250, 255, 0.28) 48%, rgba(236, 248, 255, 0.44)),
+      radial-gradient(circle at 16% 8%, rgba(255,255,255,0.82), transparent 30%),
+      radial-gradient(circle at 86% 16%, rgba(80, 152, 249, 0.16), transparent 34%),
+      radial-gradient(circle at 70% 90%, rgba(107, 208, 137, 0.12), transparent 30%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.62) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.86),
+      inset 0 -18px 36px rgba(255,255,255,0.18),
+      0 18px 48px rgba(80, 152, 249, 0.08),
+      0 2px 12px rgba(15, 23, 42, 0.04) !important;
+    backdrop-filter: blur(24px) saturate(1.25);
+    -webkit-backdrop-filter: blur(24px) saturate(1.25);
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.62), transparent 36%),
+        linear-gradient(315deg, rgba(255,255,255,0.28), transparent 34%);
+      z-index: 0;
+    }
+
+    > * {
+      position: relative;
+      z-index: 1;
+    }
+  }
+}
+
+.preview-title-group {
+  min-width: 0;
+
+  .preview-kicker {
+    display: inline-flex;
+    margin-bottom: 6px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    color: #5098f9;
+    background: rgba(80, 152, 249, 0.1);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  h4 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 800;
+  }
+}
+
+.artifact-header {
+  gap: 14px;
+
+  .completion-status {
+    flex-shrink: 0;
+
+    .percentage {
+      color: #5098f9;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+  }
+}
+
+.completion-track {
+  height: 8px;
+  padding: 2px;
+  margin: 0 0 14px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.58);
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+
+  span {
+    display: block;
+    height: 100%;
+    min-width: 6px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #a1c4fd 0%, #5098f9 68%, #6bd089 100%);
+    box-shadow: 0 0 14px rgba(80, 152, 249, 0.28);
+    transition: width 0.45s ease;
+  }
+}
+
+.scroll-container {
+  min-height: 0;
+  padding-right: 4px;
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(80, 152, 249, 0.18);
+  }
+}
+
+.preview-radar-placeholder.radar-glass {
+  position: relative;
+  height: 252px !important;
+  min-height: 252px;
+  margin: 8px 0 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  border-radius: 24px !important;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(80, 152, 249, 0.12), transparent 48%),
+    linear-gradient(145deg, rgba(255,255,255,0.5), rgba(255,255,255,0.18)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    inset 0 -12px 30px rgba(80, 152, 249, 0.05);
+  overflow: hidden;
+}
+
+.radar-halo {
+  position: absolute;
+  inset: 28px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(161, 196, 253, 0.2), transparent 62%);
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.radar-glass :deep(.radar-chart-root) {
+  position: relative;
+  z-index: 1;
+}
+
+.dimension-grid {
+  gap: 9px;
+  margin-top: 0;
+}
+
+.dimension-card {
+  position: relative;
+  margin-bottom: 0;
+  padding: 13px 14px;
+  border-radius: 18px 14px 18px 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.54), rgba(255,255,255,0.24));
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.5);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.78), 0 10px 24px rgba(80, 152, 249, 0.08);
+  }
+
+  &.success {
+    background: linear-gradient(135deg, rgba(107, 208, 137, 0.12), rgba(255,255,255,0.34));
+    border-color: rgba(107, 208, 137, 0.24);
+    &::before { background: #6bd089; }
+    .dim-status { color: #52b970; }
+    .dim-desc { color: #3c4e68; }
+  }
+
+  &.warning {
+    background: linear-gradient(135deg, rgba(232, 158, 90, 0.12), rgba(255,255,255,0.34));
+    border-color: rgba(232, 158, 90, 0.24);
+    &::before { background: #e89e5a; }
+    .dim-status { color: #e89e5a; }
+    .dim-desc { color: #3c4e68; }
+  }
+
+  &.info {
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.08), rgba(255,255,255,0.32));
+    border-color: rgba(148, 163, 184, 0.18);
+  }
+
+  .dim-header {
+    gap: 10px;
+  }
+
+  .dim-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700 !important;
+  }
+
+  .dim-status {
+    flex-shrink: 0;
+  }
+
+  .dim-desc {
+    color: #64748b;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+.empty-preview-tip {
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  color: #64748b;
+  background: rgba(255,255,255,0.38);
+  border: 1px solid rgba(255,255,255,0.48);
+  line-height: 1.7;
 }
 
 </style>

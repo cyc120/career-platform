@@ -9,11 +9,48 @@ from app.agents.learning_plan import tools
 from app.agents.learning_plan.profile_analyzer import analyze_profile
 from app.agents.learning_plan.task_planner import generate_daily_tasks as planner_generate
 from app.agents.llm_factory import get_llm
-from app.agents.job_matcher.db_utils import save_user_profile
+from app.agents.job_matcher.db_utils import save_user_profile, get_user_profile
 from app.middleware.auth import get_current_user
 
 
 DIM_ORDER = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
+
+
+async def _build_current_skills(uid: int) -> str:
+    """从 DB 读取用户画像，格式化为 LLM prompt 用的 current_skills 字符串。"""
+    import json as _json
+    profile_record = await get_user_profile(uid)
+    profile = profile_record.get("profile_data") if profile_record else None
+    if isinstance(profile, str):
+        try:
+            profile = _json.loads(profile)
+        except Exception:
+            profile = None
+
+    if not profile:
+        return "暂无用户技能数据，请从零基础开始规划"
+
+    radar = profile.get("radar_data", [])
+    details = profile.get("dimension_details", {})
+
+    parts = []
+    if radar and len(radar) >= 7:
+        for i, name in enumerate(DIM_ORDER):
+            score = radar[i] if i < len(radar) else 0
+            level = "精通" if score >= 85 else "熟练" if score >= 70 else "掌握" if score >= 55 else "基础" if score > 0 else "零基础"
+            detail = details.get(name, {})
+            desc = detail.get("desc", "") if isinstance(detail, dict) else ""
+            line = f"  - {name}: {score}分 ({level})"
+            if desc:
+                line += f" — {desc}"
+            parts.append(line)
+
+    # 用户简历摘要
+    resume = profile.get("resume_text", "")
+    if resume:
+        parts.append(f"\n用户背景：{resume[:600]}")
+
+    return "\n".join(parts) if parts else "暂无用户技能数据，请从零基础开始规划"
 
 
 def _build_save_profile(radar_data: list, dimension_details: dict, chat_history: list) -> dict:
@@ -43,6 +80,7 @@ router = APIRouter()
 
 class GenerateRequest(BaseModel):
     plan_type: str = "长期"
+    force_refresh: bool = False
 
 
 class PolishRequest(BaseModel):
@@ -77,7 +115,8 @@ class ParseFileRequest(BaseModel):
 
 @router.post("/parse-file")
 async def parse_file(req: ParseFileRequest, user: dict = Depends(get_current_user)):
-    """Parse uploaded file (PDF/DOC) and extract text content."""
+    """Parse uploaded file (PDF/DOCX/TXT) and extract text content."""
+    import asyncio
     import base64
     import io
     ext = req.filename.rsplit('.', 1)[-1].lower() if '.' in req.filename else ''
@@ -87,33 +126,46 @@ async def parse_file(req: ParseFileRequest, user: dict = Depends(get_current_use
     except Exception:
         raise HTTPException(400, "Invalid base64 data")
 
+    loop = asyncio.get_running_loop()
+
     if ext == 'pdf':
-        try:
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                # 简历通常只需前5页，跳过后续页面加快解析
+        def _parse_pdf():
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(io.BytesIO(file_bytes))
                 pages = []
-                for i, page in enumerate(pdf.pages[:5]):
-                    pages.append(page.extract_text() or '')
-            return {"success": True, "text": "\n".join(pages)}
-        except ImportError:
-            raise HTTPException(500, "pdfplumber not installed")
-        except Exception as e:
-            raise HTTPException(400, f"PDF 解析失败: {str(e)}")
+                for page in reader.pages[:3]:
+                    text = page.extract_text()
+                    if text:
+                        pages.append(text.strip())
+                return "\n\n".join(pages)
+            except ImportError:
+                raise HTTPException(500, "pypdf not installed")
+            except Exception as e:
+                raise HTTPException(400, f"PDF 解析失败: {str(e)}")
+
+        text = await loop.run_in_executor(None, _parse_pdf)
+        return {"success": True, "text": text}
 
     if ext == 'docx':
-        try:
-            from docx import Document
-            doc = Document(io.BytesIO(file_bytes))
-            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-            return {"success": True, "text": text}
-        except ImportError:
-            raise HTTPException(500, "python-docx not installed")
-        except Exception as e:
-            raise HTTPException(400, f"DOCX 解析失败: {str(e)}")
+        def _parse_docx():
+            try:
+                from docx import Document
+                doc = Document(io.BytesIO(file_bytes))
+                return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            except ImportError:
+                raise HTTPException(500, "python-docx not installed")
+            except Exception as e:
+                raise HTTPException(400, f"DOCX 解析失败: {str(e)}")
+
+        text = await loop.run_in_executor(None, _parse_docx)
+        return {"success": True, "text": text}
 
     if ext == 'doc':
         return {"success": False, "error": "暂不支持 .doc 格式，请转换为 .docx 后重新上传"}
+
+    if ext == 'txt':
+        return {"success": True, "text": file_bytes.decode("utf-8", errors="replace")}
 
     return {"success": False, "error": f"不支持的格式: .{ext}"}
 
@@ -131,7 +183,7 @@ async def generate_plan(req: GenerateRequest, user: dict = Depends(get_current_u
     existing = await tools.get_learning_plan(uid)
     existing_job = existing.get("target_job", "") if existing else ""
 
-    if existing and existing.get("phases") and (not target_job or existing_job == target_job):
+    if not req.force_refresh and existing and existing.get("phases") and (not target_job or existing_job == target_job):
         phases = existing["phases"]
         if isinstance(phases, str):
             try:
@@ -147,12 +199,15 @@ async def generate_plan(req: GenerateRequest, user: dict = Depends(get_current_u
             },
         }
 
+    # 加载用户画像，生成个性化学习计划
+    current_skills = await _build_current_skills(uid)
+
     # 直接调 LLM 生成
     llm = get_llm(temperature=0.7)
     msg = await llm.ainvoke([
         SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
         HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
-            current_skills="", target_job=target_job,
+            current_skills=current_skills, target_job=target_job,
             resources="[]", plan_type=req.plan_type,
         )),
     ])
@@ -225,11 +280,12 @@ async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_
     # 3. 计划不存在或目标岗位不匹配 → 直接调 LLM 生成计划
     if not plan or not plan.get("phases") or (target_job and plan_job != target_job):
         print(f"[API] daily-tasks: generating plan for '{target_job}' via LLM...")
+        current_skills = await _build_current_skills(uid)
         llm = get_llm(temperature=0.7)
         msg = await llm.ainvoke([
             SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
             HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
-                current_skills="", target_job=target_job,
+                current_skills=current_skills, target_job=target_job,
                 resources="[]", plan_type="长期",
             )),
         ])

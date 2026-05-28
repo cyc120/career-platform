@@ -292,7 +292,6 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -378,12 +377,52 @@ onUnmounted(() => {
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border-radius: 24px;
-  padding: 40px 50px;
+  padding: clamp(20px, 5%, 40px) clamp(24px, 6%, 50px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 20px 60px rgba(31, 38, 135, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   text-align: center;
   max-width: 480px;
   width: 100%;
+  margin: clamp(8px, 2%, 20px);
+}
+
+.loading-animation {
+  position: relative;
+  width: clamp(80px, 15vw, 120px);
+  height: clamp(80px, 15vw, 120px);
+  margin: 0 auto clamp(16px, 3vw, 28px);
+}
+
+.loading-title {
+  margin: 0 0 clamp(4px, 1vw, 8px);
+  font-size: clamp(16px, 2.5vw, 20px);
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.loading-desc {
+  margin: 0 0 clamp(16px, 3vw, 32px);
+  font-size: clamp(11px, 1.5vw, 13px);
+  color: #94a3b8;
+}
+
+.loading-steps {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1vw, 12px);
+  text-align: left;
+  margin-bottom: clamp(14px, 3vw, 28px);
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 12px);
+  font-size: clamp(11px, 1.5vw, 13px);
+  color: #94a3b8;
+  opacity: 0.4;
+  transform: translateX(-8px);
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .ai-status-bar {
@@ -403,13 +442,6 @@ onUnmounted(() => {
   border-radius: 50%;
   box-shadow: 0 0 8px #5098f9;
   animation: blink 1.5s infinite;
-}
-
-.loading-animation {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 28px;
 }
 
 .orbit-ring {
@@ -486,38 +518,6 @@ onUnmounted(() => {
 .core-icon .el-icon {
   font-size: 36px;
   color: white;
-}
-
-.loading-title {
-  margin: 0 0 8px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.loading-desc {
-  margin: 0 0 32px;
-  font-size: 13px;
-  color: #94a3b8;
-}
-
-.loading-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  text-align: left;
-  margin-bottom: 28px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: #94a3b8;
-  opacity: 0.4;
-  transform: translateX(-8px);
-  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .step-item.active {

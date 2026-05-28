@@ -1,99 +1,132 @@
 <template>
   <div class="personal-info-report">
-    <transition name="loading-fade">
-      <div v-if="reportStatus !== 'ready'" class="custom-loading-overlay">
-        <InteractiveLoading
-          title="AI 深度诊断中"
-          description="正在融合画像数据与诊断模型，生成个性化分析报告"
-          statusText="Career Pilot 诊断引擎运行中"
-          :steps="loadingSteps"
-          :currentStep="currentLoadingStep"
-          :progress="loadingProgress"
-          :showProgress="true"
-          :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书']"
-        />
-      </div>
-    </transition>
+    <div v-if="reportStatus !== 'ready'" class="custom-loading-overlay">
+      <InteractiveLoading
+        title="AI 深度诊断中"
+        description="正在融合画像数据与诊断模型，生成个性化分析报告"
+        statusText="Career Pilot 诊断引擎运行中"
+        :steps="loadingSteps"
+        :currentStep="currentLoadingStep"
+        :progress="loadingProgress"
+        :showProgress="true"
+        :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书']"
+      />
+    </div>
 
-    <el-row :gutter="20" class="row-first">
-      <el-col :span="16">
-        <el-card class="glass-card header-card">
-          <div class="user-profile">
-            <el-avatar :size="70" :src="avatarUrl" class="user-avatar" />
-            <div class="user-text">
-              <div class="name-row">
-                <h2>{{ userInfo.name || '--' }}</h2>
-                <el-tag size="small" class="status-tag">分析已就绪</el-tag>
-              </div>
-              <p class="sub-info">
-                <el-icon><School /></el-icon> {{ userInfo.school || '--' }}
-                <el-divider direction="vertical" />
-                <el-icon><Message /></el-icon> {{ userInfo.email || '--' }}
-              </p>
-            </div>
-            <el-button class="re-edit-btn" @click="$emit('re-edit')">重新编辑经历</el-button>
+    <template v-else>
+      <section class="diagnosis-hero">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            <el-icon><MagicStick /></el-icon>
+            AI 深度诊断报告
           </div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card class="glass-card score-card">
-          <div class="score-container">
-            <span class="label">综合评定</span>
-            <div class="big-score">{{ competitivenessScore }}</div>
-            <el-tag size="small" class="score-tag" v-if="competitivenessScore > 0">{{ scoreLevel }}</el-tag>
+          <h2>{{ userInfo.name || '我的职业画像' }}</h2>
+          <div class="profile-line">
+            <span><el-icon><School /></el-icon>{{ userInfo.school || '学校待补充' }}</span>
+            <span><el-icon><Message /></el-icon>{{ userInfo.email || '邮箱待补充' }}</span>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+          <div class="hero-actions">
+            <el-button class="soft-btn" :icon="Refresh" :loading="loading" @click="refreshDiagnosis">
+              重新诊断
+            </el-button>
+            <el-button class="re-edit-btn" @click="$emit('re-edit')">编辑经历</el-button>
+          </div>
+        </div>
 
-    <el-row :gutter="20" class="row-second">
-      <el-col :span="8">
-        <el-card class="glass-card detail-card">
-          <template #header><div class="card-header">学习技能完整度</div></template>
+        <div class="score-orbit" :style="{ '--score-percent': `${competitivenessScore}%` }">
+          <div class="score-ring">
+            <span class="score-number">{{ competitivenessScore }}</span>
+            <span class="score-label">综合评定</span>
+          </div>
+          <el-tag size="small" class="score-tag" v-if="competitivenessScore > 0">{{ scoreLevel }}</el-tag>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="metric-item">
+            <span class="metric-label">画像完整度</span>
+            <strong>{{ displayPercentage }}%</strong>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">优势维度</span>
+            <strong>{{ strongestDimension.name }}</strong>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">优先提升</span>
+            <strong>{{ weakestDimension.name }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="diagnosis-grid">
+        <div class="glass-panel dimension-panel">
+          <div class="section-heading">
+            <span><el-icon><DataAnalysis /></el-icon>能力维度扫描</span>
+            <em>{{ analyzedCount }}/7 已分析</em>
+          </div>
+          <div class="dimension-list">
+            <button
+              v-for="(dim, idx) in dimensionCards"
+              :key="dim.name"
+              :class="['dimension-chip', { active: selectedDimensionIndex === idx }]"
+              @click="selectDimension(idx)"
+            >
+              <span class="chip-top">
+                <span>{{ dim.name }}</span>
+                <strong>{{ dim.score }}</strong>
+              </span>
+              <span class="chip-bar"><i :style="{ width: `${dim.score}%` }"></i></span>
+              <small>{{ dim.status }}</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="glass-panel focus-panel">
+          <div class="section-heading">
+            <span><el-icon><Aim /></el-icon>{{ selectedDimension.name }}</span>
+            <em :class="selectedDimension.levelClass">{{ selectedDimension.level }}</em>
+          </div>
+          <div class="focus-score">
+            <strong>{{ selectedDimension.score }}</strong>
+            <span>分</span>
+          </div>
+          <p>{{ selectedDimension.desc }}</p>
+          <div class="focus-tags">
+            <span v-for="tag in selectedDimension.tags" :key="tag">{{ tag }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="chart-gallery">
+        <div class="glass-panel chart-card">
+          <div class="section-heading"><span>学习技能完整度</span></div>
           <div v-show="!loading" ref="completenessRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
+        </div>
 
-      <el-col :span="8">
-        <el-card class="glass-card detail-card">
-          <template #header><div class="card-header">核心竞争力模型</div></template>
+        <div class="glass-panel chart-card featured-chart">
+          <div class="section-heading"><span>核心竞争力模型</span></div>
           <div v-show="!loading" ref="radarRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
+        </div>
 
-      <el-col :span="8">
-        <el-card class="glass-card detail-card">
-          <template #header><div class="card-header">技能词云</div></template>
+        <div class="glass-panel chart-card">
+          <div class="section-heading"><span>技能关键词</span></div>
           <div v-if="!loading && wordCloudData.length >= 3" ref="wordCloudRef" class="chart-container"></div>
           <div v-else-if="!loading" class="cloud-empty">
-            <span class="cloud-empty-icon">💡</span>
-            <span>技能有待提升哦</span>
+            <span class="cloud-empty-icon">+</span>
+            <span>继续补充经历后生成</span>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </section>
 
-    <el-row :gutter="20" class="row-third">
-      <el-col :span="24">
-        <el-card class="glass-card ai-report-card">
-          <template #header>
-            <div class="card-header">
-              <el-icon><MagicStick /></el-icon> AI 深度诊断报告
-            </div>
-          </template>
-<div class="report-content-grid">
-  <div class="report-item" v-if="analysisReport">
-    <h4>AI 深度诊断报告</h4>
-    <p>{{ analysisReport }}</p>
-  </div>
-  <div class="report-item" v-else>
-    <h4>AI 深度诊断报告</h4>
-    <el-skeleton :rows="3" animated />
-  </div>
-</div>
-        </el-card>
-      </el-col>
-    </el-row>
+      <section class="glass-panel ai-report-card">
+        <div class="section-heading">
+          <span><el-icon><MagicStick /></el-icon>诊断结论</span>
+        </div>
+        <div v-if="analysisReport" class="report-content-grid">
+          <p v-for="(paragraph, idx) in reportParagraphs" :key="idx">{{ paragraph }}</p>
+        </div>
+        <el-skeleton v-else :rows="4" animated />
+      </section>
+    </template>
   </div>
 </template>
 
@@ -105,7 +138,7 @@ let _cachedResults = null
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { School, Message, MagicStick } from '@element-plus/icons-vue'
+import { School, Message, MagicStick, Refresh, DataAnalysis, Aim } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
 import { diagnosisApi } from '@/api/diagnosis'
@@ -154,9 +187,7 @@ const stopLoadingAnimation = () => {
   currentLoadingStep.value = loadingSteps.length
   clearInterval(loadingTimer)
   clearInterval(progressTimer)
-  setTimeout(() => {
-    reportStatus.value = 'ready'
-  }, 300)
+  reportStatus.value = 'ready'
 }
 
 // 综合评定等级
@@ -181,6 +212,75 @@ const analysisReport = ref('')
 const skillRadarData = ref([0, 0, 0, 0, 0, 0, 0])
 const wordCloudData = ref([])
 const displayPercentage = ref(0)
+const selectedDimensionIndex = ref(0)
+
+const analyzedCount = computed(() => {
+  const details = dimensionDetailsRaw.value || {}
+  return DIM_NAMES.filter((dim, idx) => {
+    const score = details?.[dim]?.score || skillRadarData.value[idx] || 0
+    return score > 0 && details?.[dim]?.status === '已分析'
+  }).length
+})
+
+const getDimensionLevel = (score) => {
+  if (score >= 85) return { text: '突出优势', className: 'excellent' }
+  if (score >= 70) return { text: '稳定优势', className: 'good' }
+  if (score >= 50) return { text: '可塑空间', className: 'normal' }
+  if (score > 0) return { text: '优先补强', className: 'weak' }
+  return { text: '待补充', className: 'pending' }
+}
+
+const extractTags = (text = '') => {
+  const words = text.split(/[,，、\s;；。]+/)
+    .map(item => item.replace(/[。.（）()：:]/g, '').trim())
+    .filter(item => item.length >= 2 && item.length <= 8)
+  return [...new Set(words)].slice(0, 4)
+}
+
+const dimensionCards = computed(() => {
+  const details = dimensionDetailsRaw.value || {}
+  return DIM_NAMES.map((name, idx) => {
+    const detail = details?.[name] || {}
+    const score = detail.score || skillRadarData.value[idx] || 0
+    const level = getDimensionLevel(score)
+    const desc = detail.desc && detail.desc !== '暂无相关信息'
+      ? detail.desc
+      : score > 0 ? '该维度已有基础，可结合项目经历继续沉淀可展示成果。' : '当前信息不足，建议补充相关经历、成果或证明材料。'
+    return {
+      name,
+      score,
+      status: detail.status || (score > 0 ? '已分析' : '待补充'),
+      desc,
+      level: level.text,
+      levelClass: level.className,
+      tags: extractTags(desc).length ? extractTags(desc) : [level.text],
+    }
+  })
+})
+
+const selectedDimension = computed(() => dimensionCards.value[selectedDimensionIndex.value] || dimensionCards.value[0] || {
+  name: '能力维度',
+  score: 0,
+  desc: '暂无画像数据',
+  level: '待补充',
+  levelClass: 'pending',
+  tags: ['待补充'],
+})
+
+const scoredDimensions = computed(() => dimensionCards.value.filter(item => item.score > 0))
+const strongestDimension = computed(() => scoredDimensions.value.slice().sort((a, b) => b.score - a.score)[0] || { name: '--', score: 0 })
+const weakestDimension = computed(() => scoredDimensions.value.slice().sort((a, b) => a.score - b.score)[0] || { name: '--', score: 0 })
+const reportParagraphs = computed(() => {
+  if (!analysisReport.value) return []
+  return analysisReport.value
+    .split(/(?<=[。！？!?])\s*/)
+    .map(item => item.trim())
+    .filter(Boolean)
+})
+
+const selectDimension = (idx) => {
+  selectedDimensionIndex.value = idx
+}
 
 const computeHash = () => {
   const r = currentRadarData.value || []
@@ -194,6 +294,18 @@ const applyCached = (cache) => {
   competitivenessScore.value = cache.competitivenessScore
   wordCloudData.value = [...cache.wordCloudData]
   displayPercentage.value = cache.displayPercentage
+}
+
+const refreshDiagnosis = async () => {
+  loading.value = true
+  reportStatus.value = 'updating'
+  startLoadingAnimation()
+  await buildFromProfileData(true)
+  stopLoadingAnimation()
+  await nextTick()
+  initRadarChart()
+  initCompletenessChart()
+  initWordCloud()
 }
 
 const buildFromProfileData = async (forceApi = false) => {
@@ -324,11 +436,11 @@ watch([currentRadarData, dimensionDetailsRaw], async () => {
   if (reportStatus.value === 'ready') {
     reportStatus.value = 'updating'
     await buildFromProfileData(true)
+    reportStatus.value = 'ready'
     await nextTick()
     initRadarChart()
     initCompletenessChart()
     initWordCloud()
-    setTimeout(() => { reportStatus.value = 'ready' }, 1500)
   }
 }, { deep: true })
 
@@ -351,14 +463,11 @@ onMounted(async () => {
   startLoadingAnimation()
 
   await buildFromProfileData()
-  await nextTick()
-  setTimeout(() => {
-    initRadarChart()
-    initCompletenessChart()
-    initWordCloud()
-  }, 150)
-
   stopLoadingAnimation()
+  await nextTick()
+  initRadarChart()
+  initCompletenessChart()
+  initWordCloud()
 })
 
 // 🌟 4. 这里的销毁和注销很重要
@@ -388,19 +497,19 @@ const initRadarChart = () => {
         { name: '沟通能力', max: 100 },
         { name: '证书', max: 100 },
       ],
-      radius: '60%',
+      radius: '56%',
       axisName: { color: '#475569', fontWeight: 'bold', fontSize: 12 },
-      axisLine: { lineStyle: { color: 'rgba(112, 161, 255, 0.5)' } },
-      splitLine: { lineStyle: { color: 'rgba(112, 161, 255, 0.4)' } },
-      splitArea: { areaStyle: { color: ['rgba(255, 255, 255, 0.05)', 'rgba(112, 161, 255, 0.1)'] } }
+      axisLine: { lineStyle: { color: 'rgba(80, 152, 249, 0.42)' } },
+      splitLine: { lineStyle: { color: 'rgba(80, 152, 249, 0.28)' } },
+      splitArea: { areaStyle: { color: ['rgba(255, 255, 255, 0.06)', 'rgba(80, 152, 249, 0.08)'] } }
     },
     series: [{
       type: 'radar',
       data: [{
         value: skillRadarData.value,
-        areaStyle: { color: 'rgba(112, 161, 255, 0.25)' },
-        lineStyle: { color: '#70a1ff', width: 2.5 },
-        itemStyle: { color: '#70a1ff' }
+        areaStyle: { color: 'rgba(80, 152, 249, 0.22)' },
+        lineStyle: { color: '#5098f9', width: 2.5 },
+        itemStyle: { color: '#5098f9' }
       }]
     }]
   })
@@ -414,7 +523,7 @@ const initCompletenessChart = () => {
   const scores = skillRadarData.value
 
   completenessInstance.setOption({
-    grid: { left: 80, right: 30, top: 10, bottom: 10 },
+    grid: { left: 72, right: 34, top: 8, bottom: 8, containLabel: false },
     xAxis: {
       type: 'value',
       max: 100,
@@ -435,13 +544,13 @@ const initCompletenessChart = () => {
         value: v,
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: '#70a1ff' },
-            { offset: 1, color: '#a5b4fc' },
+            { offset: 0, color: '#a1c4fd' },
+            { offset: 1, color: '#5098f9' },
           ]),
           borderRadius: [0, 6, 6, 0],
         },
       })),
-      barWidth: 18,
+      barWidth: 16,
       label: {
         show: true,
         position: 'right',
@@ -462,9 +571,9 @@ const initWordCloud = () => {
   if (!data.length) return
 
   const colorPalette = [
-    'rgba(112, 161, 255, 0.85)', 'rgba(165, 180, 252, 0.85)',
-    'rgba(153, 246, 228, 0.85)', 'rgba(254, 240, 138, 0.85)',
-    'rgba(125, 211, 252, 0.85)', 'rgba(196, 181, 253, 0.85)',
+    'rgba(80, 152, 249, 0.82)', 'rgba(161, 196, 253, 0.84)',
+    'rgba(107, 208, 137, 0.78)', 'rgba(232, 158, 90, 0.72)',
+    'rgba(194, 233, 251, 0.82)', 'rgba(252, 211, 126, 0.72)',
   ]
 
   wordCloudInstance.setOption({
@@ -476,11 +585,11 @@ const initWordCloud = () => {
       force: { repulsion: 120, edgeLength: 30, gravity: 0.1 },
       data: data.map((item, index) => ({
         name: item.name,
-        symbolSize: Math.max(item.name.length * 14 + 20, 30),
+        symbolSize: Math.min(Math.max(item.name.length * 12 + 18, 30), 86),
         itemStyle: {
           color: colorPalette[index % colorPalette.length],
           shadowBlur: 15,
-          shadowColor: 'rgba(112, 161, 255, 0.3)',
+          shadowColor: 'rgba(80, 152, 249, 0.26)',
           borderColor: 'rgba(255,255,255,0.6)',
           borderWidth: 2,
         },
@@ -499,175 +608,515 @@ const initWordCloud = () => {
 
 <style scoped lang="scss">
 .custom-loading-overlay {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  min-height: 80vh;
-  height: 100%;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(246, 248, 255, 0.85);
-  backdrop-filter: blur(12px);
+  flex: 1;
+  min-height: 400px;
   border-radius: 20px;
+  overflow: hidden;
 }
-
-.loading-fade-enter-active,
-.loading-fade-leave-active { transition: opacity 0.5s ease; }
-.loading-fade-enter-from,
-.loading-fade-leave-to { opacity: 0; }
 
 .personal-info-report {
-  display: flex; flex-direction: column; gap: 20px; padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px;
   position: relative;
+  color: #172033;
+  overflow-x: hidden;
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.4) !important;
-  backdrop-filter: blur(20px) saturate(1.1);
-  -webkit-backdrop-filter: blur(20px) saturate(1.1);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-  height: 100%;
-  transition: all 0.3s ease;
+.glass-panel,
+.diagnosis-hero {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(245, 252, 255, 0.24) 42%, rgba(236, 248, 255, 0.42)),
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.86), transparent 30%),
+    radial-gradient(circle at 86% 18%, rgba(80, 152, 249, 0.18), transparent 32%),
+    radial-gradient(circle at 70% 92%, rgba(107, 208, 137, 0.12), transparent 28%);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -18px 36px rgba(255, 255, 255, 0.18),
+    0 18px 46px rgba(80, 152, 249, 0.08),
+    0 2px 10px rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(24px) saturate(1.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.68), transparent 38%),
+      linear-gradient(315deg, rgba(255,255,255,0.32), transparent 34%);
+    opacity: 0.82;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    right: -72px;
+    top: -86px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.34);
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.diagnosis-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(150px, 190px) minmax(210px, 0.8fr);
+  gap: 18px;
+  align-items: center;
+  border-radius: 28px;
+  padding: 24px;
+
+  .hero-copy {
+    min-width: 0;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    color: #5098f9;
+    background: rgba(80, 152, 249, 0.1);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  h2 {
+    margin: 16px 0 10px;
+    font-size: 28px;
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: 0;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .profile-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    color: #64748b;
+    font-size: 13px;
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+  }
+
+  .soft-btn,
+  .re-edit-btn {
+    border-radius: 12px;
+    font-weight: 700;
+    min-width: 96px;
+  }
+
+  .soft-btn {
+    border: 0;
+    color: #fff;
+    background: linear-gradient(135deg, #a1c4fd 0%, #5098f9 100%);
+    box-shadow: 0 10px 24px rgba(80, 152, 249, 0.22);
+  }
+
+  .re-edit-btn {
+    border-color: rgba(80, 152, 249, 0.22);
+    color: #5098f9;
+    background: rgba(255, 255, 255, 0.65);
+  }
+}
+
+.score-orbit {
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  .score-ring {
+    width: clamp(132px, 13vw, 158px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    background:
+      radial-gradient(circle at 36% 26%, rgba(255,255,255,0.95) 0 11%, transparent 12%),
+      radial-gradient(circle at center, rgba(255,255,255,0.9) 0 57%, transparent 58%),
+      conic-gradient(#5098f9 0 var(--score-percent), rgba(107, 208, 137, 0.42) var(--score-percent) 100%);
+    box-shadow:
+      inset 0 10px 22px rgba(255,255,255,0.72),
+      inset 0 -12px 28px rgba(80, 152, 249, 0.08),
+      0 14px 35px rgba(80, 152, 249, 0.14);
+  }
+
+  .score-number {
+    font-size: clamp(34px, 3.6vw, 42px);
+    font-weight: 900;
+    line-height: 1;
+    color: #0f172a;
+  }
+
+  .score-label {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+  }
+
+  .score-tag {
+    border: 0;
+    color: #52b970;
+    background: rgba(107, 208, 137, 0.14);
+  }
+}
+
+.hero-metrics {
+  display: grid;
+  gap: 10px;
+
+  .metric-item {
+    min-height: 58px;
+    padding: 11px 13px;
+    border-radius: 18px 14px 18px 14px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.22));
+    border: 1px solid rgba(255, 255, 255, 0.52);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+
+    &:hover {
+      transform: translateX(2px);
+      border-color: rgba(80, 152, 249, 0.24);
+    }
+  }
+
+  .metric-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 800;
+  }
+}
+
+.diagnosis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.75fr);
+  gap: 16px;
+}
+
+.glass-panel {
+  border-radius: 24px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  em {
+    flex-shrink: 0;
+    font-style: normal;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+
+    &.excellent { color: #6bd089; }
+    &.good { color: #5098f9; }
+    &.normal { color: #e89e5a; }
+    &.weak { color: #dc2626; }
+    &.pending { color: #64748b; }
+  }
+}
+
+.dimension-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  gap: 9px;
+}
+
+.dimension-chip {
+  min-width: 0;
+  min-height: 88px;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 19px 15px 19px 15px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.2)),
+    radial-gradient(circle at 22% 0%, rgba(255,255,255,0.62), transparent 34%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.5) !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.07);
+    transform: translateY(-2px);
+    border-color: rgba(80, 152, 249, 0.26);
+    box-shadow: 0 10px 22px rgba(30, 41, 59, 0.07);
   }
 
-  :deep(.el-card__header) {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
-    background: rgba(255, 255, 255, 0.2);
-  }
-}
-
-.row-first {
-  .user-profile {
-    display: flex; align-items: center; gap: 24px; height: 100px;
-    .user-text { 
-      flex: 1; 
-      h2 { margin: 0; color: #1e293b; } 
-      .sub-info { color: #64748b; font-size: 14px; margin-top: 5px; } 
-    }
-    
-    /* 🌟 Tag 颜色修改 */
-    :deep(.status-tag) {
-      background: rgba(112, 161, 255, 0.1) !important;
-      color: #70a1ff !important;
-      border: 1px solid rgba(112, 161, 255, 0.2) !important;
-    }
-
-    /* 🌟 按钮颜色修改 */
-    .re-edit-btn {
-      margin-left: auto; background: transparent; 
-      border: 1px solid rgba(112, 161, 255, 0.3); color: #70a1ff;
-      &:hover { background: rgba(112, 161, 255, 0.05); }
-    }
+  &.active {
+    background:
+      linear-gradient(145deg, rgba(232, 245, 255, 0.72), rgba(236, 253, 245, 0.44)),
+      radial-gradient(circle at 18% 8%, rgba(255,255,255,0.74), transparent 34%);
+    border-color: rgba(80, 152, 249, 0.32);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 12px 26px rgba(80, 152, 249, 0.1);
   }
 
-  .score-card {
-    .score-container {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px;
-      .label { font-size: 12px; color: #94a3b8; }
-      /* 🌟 分数改用淡蓝渐变 */
-      .big-score { 
-        font-size: 48px; font-weight: 800; 
-        background: linear-gradient(135deg, #0e3378 0%, #bdc3fc 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        line-height: 1; margin: 5px 0; 
-      }
-      :deep(.el-tag) { background: rgba(112, 161, 255, 0.05) !important; color: #70a1ff !important; border: none; }
-    }
-  }
-}
-
-/* 找到对应的词云容器样式 */
-/* 请找到这部分样式，并加上注释了"🌟"的两行 */
-.row-second {
-  .detail-card {
-    height: 320px;
-    /* 1. 确保卡片本身不出现滚动条 */
-    overflow: hidden !important; 
-
-    /* 2. 🌟 关键：强制覆盖 Element Plus 卡片内部容器的溢出设置 */
-    :deep(.el-card__body) {
-      height: 270px; 
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;    
-      justify-content: center; 
-      padding: 0; 
-      overflow: hidden !important; /* 🌟 加上这一行，干掉内层滚动条 */
-    }
-
-    .chart-container {
-      width: 100%;
-      height: 240px;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    .cloud-empty {
-      width: 100%;
-      height: 240px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      color: #94a3b8;
-      font-size: 14px;
-      .cloud-empty-icon { font-size: 28px; }
-    }
-  }
-}
-
-.row-third {
-  .ai-report-card {
-    .card-header { 
-      display: flex; align-items: center; gap: 8px; font-weight: bold; color: #70a1ff; 
-    }
-    .report-content-grid {
-      display: block; padding: 10px 0;
-      .report-item {
-  margin-bottom: 30px;
-
-  h4 {
-    font-size: 17px;
-    font-weight: 700;
-    color: #1e1b4b;
-    margin-bottom: 16px;
+  .chip-top {
     display: flex;
-    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #1e293b;
+    font-size: 13px;
+    font-weight: 800;
 
-    // 增加一个小装饰条
-    &::before {
-      content: "";
-      width: 4px;
-      height: 18px;
-      background: #6366f1;
-      margin-right: 10px;
-      border-radius: 2px;
+    span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  strong {
+    color: #5098f9;
+  }
+
+  .chip-bar {
+    display: block;
+    height: 6px;
+    margin: 13px 0 9px;
+    border-radius: 999px;
+    background: rgba(226, 232, 240, 0.9);
+    overflow: hidden;
+
+    i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #a1c4fd, #5098f9);
+    }
+  }
+
+  small {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+  }
+}
+
+.focus-panel {
+  min-height: 0;
+
+  .focus-score {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 8px;
+
+    strong {
+      font-size: 42px;
+      line-height: 1;
+      color: #0f172a;
+    }
+
+    span {
+      color: #64748b;
+      font-weight: 700;
     }
   }
 
   p {
-    font-size: 14px;
-    line-height: 1.8;
+    max-height: 92px;
+    margin: 0 0 14px;
     color: #475569;
-    margin-bottom: 12px; // 段落之间的间距
-    text-align: justify; // 保证边缘整齐
-    
-    // 如果不想要缩进，可以删掉下面这行
-    text-indent: 0; 
+    font-size: 13px;
+    line-height: 1.7;
+    overflow: auto;
+  }
+
+  .focus-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    span {
+      padding: 6px 9px;
+      border-radius: 999px;
+      color: #5098f9;
+      background: rgba(80, 152, 249, 0.1);
+      font-size: 12px;
+      font-weight: 700;
+    }
   }
 }
-    }
+
+.chart-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chart-card {
+  height: 306px;
+  min-width: 0;
+  overflow: hidden;
+
+  &.featured-chart {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.84), rgba(235, 245, 255, 0.55));
+  }
+
+  .chart-container {
+    width: 100%;
+    height: 236px;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .cloud-empty {
+    height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .cloud-empty-icon {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #5098f9;
+    background: rgba(80, 152, 249, 0.1);
+    font-size: 24px;
+  }
+}
+
+.ai-report-card {
+  .report-content-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  p {
+    margin: 0;
+    padding: 14px 15px;
+    border-radius: 18px 14px 18px 14px;
+    color: #334155;
+    background: linear-gradient(135deg, rgba(255,255,255,0.54), rgba(255,255,255,0.24));
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-left: 4px solid rgba(80, 152, 249, 0.42);
+    font-size: 14px;
+    line-height: 1.85;
+    text-align: justify;
+  }
+}
+
+@media (max-width: 1180px) {
+  .diagnosis-hero {
+    grid-template-columns: minmax(0, 1fr) 170px;
+  }
+
+  .hero-metrics {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dimension-list {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  }
+
+  .chart-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .diagnosis-hero,
+  .diagnosis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .score-orbit {
+    justify-self: start;
+  }
+
+  .hero-metrics,
+  .dimension-list {
+    grid-template-columns: 1fr;
+  }
+
+  .dimension-chip {
+    min-height: 82px;
+  }
+
+  .chart-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card {
+    height: 292px;
   }
 }
 </style>

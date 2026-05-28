@@ -38,8 +38,14 @@ function doInit() {
       shape: 'circle',
       splitNumber: 4,
       axisName: { color: '#64748b', fontSize: 11, padding: [2, 10] },
-      splitLine: { lineStyle: { color: 'rgba(0,0,0,0.05)' } },
-      splitArea: { show: false }
+      axisLine: { lineStyle: { color: 'rgba(80, 152, 249, 0.16)' } },
+      splitLine: { lineStyle: { color: 'rgba(80, 152, 249, 0.12)' } },
+      splitArea: {
+        show: true,
+        areaStyle: {
+          color: ['rgba(255,255,255,0.04)', 'rgba(80,152,249,0.05)']
+        }
+      }
     },
     series: [{
       type: 'radar',
@@ -48,13 +54,14 @@ function doInit() {
         name: '能力画像',
         areaStyle: {
           color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-            { color: 'rgba(102, 126, 234, 0.4)', offset: 0 },
-            { color: 'rgba(118, 75, 162, 0.6)', offset: 1 }
+            { color: 'rgba(161, 196, 253, 0.35)', offset: 0 },
+            { color: 'rgba(80, 152, 249, 0.42)', offset: 1 }
           ])
         },
-        lineStyle: { color: '#4f46e5', width: 2 },
-        itemStyle: { color: '#4f46e5', borderWidth: 0 },
-        symbol: 'none'
+        lineStyle: { color: '#5098f9', width: 2 },
+        itemStyle: { color: '#5098f9', borderColor: '#fff', borderWidth: 1 },
+        symbol: 'circle',
+        symbolSize: 4
       }],
       animationDuration: 1200
     }]

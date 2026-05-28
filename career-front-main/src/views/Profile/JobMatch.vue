@@ -1,27 +1,7 @@
 <template>
   <div class="job-match-container">
     <div class="job-match-content">
-      <!-- 顶部操作区 -->
-      <div class="action-bar glass-card">
-        <div class="action-left">
-          <h2 class="page-title">
-            <el-icon><Connection /></el-icon>
-            人岗智能匹配
-          </h2>
-          <p class="page-desc">基于 AI 多维度评估，为你推荐最匹配的岗位</p>
-        </div>
-        <el-button
-          type="primary"
-          class="match-btn"
-          :loading="loading"
-          @click="startMatch"
-        >
-          <el-icon class="el-icon--left"><MagicStick /></el-icon>
-          {{ hasData ? '重新匹配' : '开始匹配' }}
-        </el-button>
-      </div>
-
-      <!-- 加载状态 - 首页风格 -->
+      <!-- 加载状态 -->
       <div v-if="loading" class="loading-section">
         <InteractiveLoading
           title="智能匹配分析中"
@@ -42,7 +22,7 @@
             <el-icon :size="64"><Briefcase /></el-icon>
           </div>
           <h3>暂无匹配数据</h3>
-          <p>点击上方"开始匹配"按钮，AI 将为你分析最适合的岗位</p>
+          <p>请先在「个人信息」中完成 AI 对话分析，生成个人画像后系统将自动进行匹配</p>
         </div>
       </div>
 
@@ -103,14 +83,16 @@
                   </div>
                 </div>
                 <el-button
-                  :type="lockedIndex === idx ? 'primary' : 'default'"
-                  :icon="lockedIndex === idx ? Lock : Unlock"
-                  :loading="lockingIndex === idx"
-                  circle
+                  :type="isJobLocked(job) ? 'primary' : 'default'"
+                  :icon="isJobLocked(job) ? Lock : Unlock"
+                  :loading="lockingKey === getJobKey(job)"
+                  :disabled="!!lockingKey && lockingKey !== getJobKey(job)"
                   size="small"
-                  class="lock-btn"
+                  :class="['lock-btn', { locked: isJobLocked(job) }]"
                   @click.stop="lockJob(idx)"
-                />
+                >
+                  {{ isJobLocked(job) ? '已锁定' : '锁定' }}
+                </el-button>
                 <el-icon
                   v-if="job.job_id"
                   class="detail-icon"
@@ -191,8 +173,18 @@
           <!-- 查看岗位详情按钮 -->
           <div class="action-footer">
             <el-button
+              :type="isJobLocked(selectedJob) ? 'primary' : 'success'"
+              size="large"
+              class="lock-main-btn"
+              :icon="isJobLocked(selectedJob) ? Lock : Unlock"
+              :loading="lockingKey === getJobKey(selectedJob)"
+              :disabled="!!lockingKey && lockingKey !== getJobKey(selectedJob)"
+              @click="lockJob(selectedIndex)"
+            >
+              {{ isJobLocked(selectedJob) ? '取消锁定当前岗位' : '锁定为目标岗位' }}
+            </el-button>
+            <el-button
               v-if="selectedJob.job_id"
-              type="primary"
               size="large"
               class="detail-btn"
               @click="goToJobDetail"
@@ -213,7 +205,7 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import {
-  MagicStick, Connection, DataAnalysis, List, Location, Money,
+  DataAnalysis, List, Location, Money,
   ChatDotRound, Histogram, Warning, Aim, Link,
   Briefcase, OfficeBuilding, Lock, Unlock
 } from '@element-plus/icons-vue'
@@ -262,8 +254,8 @@ let progressTimer = null
 
 const hasData = computed(() => rankedResults.value.length > 0)
 const selectedJob = computed(() => rankedResults.value[selectedIndex.value] || {})
-const lockedIndex = ref(null)
-const lockingIndex = ref(null)
+const lockedJobKey = ref('')
+const lockingKey = ref('')
 
 const dimensionList = computed(() => {
   const scores = selectedJob.value.scores || {}
@@ -275,10 +267,16 @@ const dimensionList = computed(() => {
 })
 
 // ==================== 匹配逻辑 ====================
-const startMatch = async () => {
+const startMatch = async ({ resetLock = false } = {}) => {
   loading.value = true
   rankedResults.value = []
   selectedIndex.value = 0
+  if (resetLock) {
+    lockedJobKey.value = ''
+    hasMatchData.value = false
+    parentSelectedJob.value = null
+    matchingApi.clearSelectedJob().catch(() => {})
+  }
   clearCache()
   // 清除成长追踪缓存，触发重新加载
   sessionStorage.removeItem('growth_tracker_cache')
@@ -331,15 +329,16 @@ const startMatch = async () => {
 
     rankedResults.value = results
     selectedIndex.value = 0
-    lockedIndex.value = null
     currentStep.value = loadingSteps.length - 1
     progressPercent.value = 100
     saveToCache(results, 0, hashProfile(currentRadarData.value))
-    hasMatchData.value = true
     ElMessage.success(`匹配完成，共找到 ${results.length} 个岗位`)
 
     await nextTick()
-    requestAnimationFrame(() => initRadarChart())
+    requestAnimationFrame(() => {
+      initRadarChart()
+      if (!resetLock) restoreLockState()
+    })
   } catch (err) {
     console.error('[JobMatch] match failed:', err)
     ElMessage.error('匹配请求失败，请稍后重试')
@@ -360,32 +359,46 @@ const selectJob = (idx) => {
 }
 
 // ==================== 锁定岗位 ====================
+const getJobKey = (job = {}) => {
+  if (!job || Object.keys(job).length === 0) return ''
+  return String(job.job_id || `${job.job_title || ''}__${job.company || ''}`)
+}
+
+const isJobLocked = (job) => !!lockedJobKey.value && lockedJobKey.value === getJobKey(job)
+
+const clearLocalLockState = () => {
+  lockedJobKey.value = ''
+  hasMatchData.value = false
+  parentSelectedJob.value = null
+  sessionStorage.removeItem('growth_tracker_cache')
+}
+
 const lockJob = async (idx) => {
-  if (lockedIndex.value === idx) {
-    // 取消锁定
-    lockedIndex.value = null
-    hasMatchData.value = false
-    parentSelectedJob.value = null
-    sessionStorage.removeItem('growth_tracker_cache')
-    matchingApi.clearSelectedJob().catch(() => {})
-    ElMessage.info('已取消锁定')
-    return
-  }
-  lockingIndex.value = idx
+  const job = rankedResults.value[idx]
+  const key = getJobKey(job)
+  if (!job || !key || lockingKey.value) return
+
+  lockingKey.value = key
   try {
-    const job = rankedResults.value[idx]
-    // 先清除成长追踪缓存，确保切换岗位后重新获取数据
-    sessionStorage.removeItem('growth_tracker_cache')
+    if (isJobLocked(job)) {
+      await matchingApi.clearSelectedJob()
+      clearLocalLockState()
+      ElMessage.info('已取消锁定')
+      return
+    }
+
+    selectedIndex.value = idx
     await matchingApi.selectJob(job)
-    lockedIndex.value = idx
+    lockedJobKey.value = key
     hasMatchData.value = true
     parentSelectedJob.value = job
-    ElMessage.success(`已锁定「${job.job_title}」，学习计划已生成`)
+    sessionStorage.removeItem('growth_tracker_cache')
+    ElMessage.success(`已锁定「${job.job_title || '目标岗位'}」`)
   } catch (err) {
     console.error('[JobMatch] lock job failed:', err)
-    ElMessage.error('锁定失败，请重试')
+    ElMessage.error(isJobLocked(job) ? '取消锁定失败，请重试' : '锁定失败，请重试')
   } finally {
-    lockingIndex.value = null
+    lockingKey.value = ''
   }
 }
 
@@ -396,12 +409,16 @@ const restoreLockState = async () => {
     if (data.success && data.data) {
       const saved = data.data
       const idx = rankedResults.value.findIndex(
-        j => j.job_title === saved.job_title && j.company === saved.company
+        j => getJobKey(j) === getJobKey(saved) || (j.job_title === saved.job_title && j.company === saved.company)
       )
       if (idx >= 0) {
-        lockedIndex.value = idx
+        lockedJobKey.value = getJobKey(rankedResults.value[idx])
         hasMatchData.value = true
         parentSelectedJob.value = rankedResults.value[idx]
+      } else {
+        lockedJobKey.value = getJobKey(saved)
+        hasMatchData.value = true
+        parentSelectedJob.value = saved
       }
     }
   } catch { /* ignore */ }
@@ -560,6 +577,9 @@ onMounted(() => {
       requestAnimationFrame(() => initRadarChart())
       restoreLockState()
     })
+  } else if (currentRadarData.value && currentRadarData.value.some(v => v > 0) && rankedResults.value.length === 0) {
+    // Auto-trigger matching when profile data exists and no valid cache
+    nextTick(() => startMatch())
   }
 })
 
@@ -574,11 +594,10 @@ watch(selectedIndex, () => {
   nextTick(() => updateRadarChart())
 })
 
-// Profile changed → clear stale results so user sees empty state and must re-match
+// Profile changed → auto re-match
 watch(currentRadarData, (newVal, oldVal) => {
   if (!newVal || !oldVal) return
-  // Only clear if the data actually changed (not initial mount)
-  if (JSON.stringify(newVal) !== JSON.stringify(oldVal) && rankedResults.value.length > 0) {
+  if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
     rankedResults.value = []
     selectedIndex.value = 0
     clearCache()
@@ -586,7 +605,7 @@ watch(currentRadarData, (newVal, oldVal) => {
       radarInstance.dispose()
       radarInstance = null
     }
-    ElMessage.info('画像数据已更新，请重新匹配')
+    nextTick(() => startMatch({ resetLock: true }))
   }
 })
 </script>
@@ -602,6 +621,9 @@ watch(currentRadarData, (newVal, oldVal) => {
 .job-match-content {
   max-width: 1400px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 100px);
 }
 
 /* 玻璃卡片通用 */
@@ -638,49 +660,10 @@ watch(currentRadarData, (newVal, oldVal) => {
   }
 }
 
-/* 顶部操作栏 */
-.action-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-
-  .page-title {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 700;
-    color: #1e293b;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    .el-icon { color: #5098f9; font-size: 24px; }
-  }
-  .page-desc {
-    margin: 6px 0 0;
-    font-size: 13px;
-    color: #94a3b8;
-  }
-
-  .match-btn {
-    background: linear-gradient(135deg, #a1c4fd 0%, #5098f9 100%);
-    border: none;
-    border-radius: 12px;
-    padding: 12px 28px;
-    font-weight: 600;
-    box-shadow: 0 4px 16px rgba(80, 152, 249, 0.3);
-    transition: all 0.3s;
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(80, 152, 249, 0.4);
-    }
-  }
-}
-
-/* 加载状态 - 使用 InteractiveLoading 组件 */
+/* 加载状态 - 自适应容器大小 */
 .loading-section {
-  height: 70vh;
-  min-height: 500px;
+  flex: 1;
+  min-height: 400px;
   border-radius: 20px;
   overflow: hidden;
 }
@@ -893,7 +876,14 @@ watch(currentRadarData, (newVal, oldVal) => {
 
       .lock-btn {
         flex-shrink: 0;
+        width: 82px;
+        border-radius: 10px;
+        font-weight: 600;
         transition: all 0.2s;
+
+        &.locked {
+          box-shadow: 0 4px 12px rgba(80, 152, 249, 0.22);
+        }
       }
 
       .detail-icon {
@@ -1044,21 +1034,36 @@ watch(currentRadarData, (newVal, oldVal) => {
 }
 
 .action-footer {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-top: 8px;
   padding: 16px 0;
 
+  .lock-main-btn,
   .detail-btn {
-    background: linear-gradient(135deg, #a1c4fd 0%, #5098f9 100%);
-    border: none;
     border-radius: 12px;
     padding: 12px 32px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(80, 152, 249, 0.3);
     transition: all 0.3s;
 
     &:hover {
       transform: translateY(-2px);
+    }
+  }
+
+  .lock-main-btn {
+    border: none;
+    box-shadow: 0 4px 16px rgba(107, 208, 137, 0.25);
+  }
+
+  .detail-btn {
+    background: linear-gradient(135deg, #a1c4fd 0%, #5098f9 100%);
+    border: none;
+    box-shadow: 0 4px 16px rgba(80, 152, 249, 0.3);
+
+    &:hover {
       box-shadow: 0 6px 24px rgba(80, 152, 249, 0.4);
     }
   }
@@ -1088,10 +1093,5 @@ watch(currentRadarData, (newVal, oldVal) => {
     grid-template-columns: 1fr;
   }
 
-  .action-bar {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
 }
 </style>
