@@ -1,5 +1,16 @@
 <template>
   <div class="growth-tracking-center fade-in">
+    <!-- 顶部标题卡片 -->
+    <div class="action-bar glass-card">
+      <div class="action-left">
+        <h2 class="page-title">
+          <el-icon><TrendCharts /></el-icon>
+          成长追踪中心
+        </h2>
+        <p class="page-desc">AI 驱动的个性化学习计划，助你稳步成长</p>
+      </div>
+    </div>
+
     <!-- 加载状态 - 与人岗匹配一致 -->
     <div v-if="pageLoading" class="loading-section">
       <InteractiveLoading
@@ -1286,9 +1297,33 @@ watch(isCoachingOpen, (open) => {
 
 /* 加载状态 - 自适应容器大小 */
 .loading-section {
-  flex: 1;
-  min-height: 400px;
+  height: 65vh;
+  min-height: 500px;
   border-radius: 20px;
   overflow: hidden;
+}
+
+/* 顶部操作栏 */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+
+  .page-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    .el-icon { color: #5098f9; font-size: 24px; }
+  }
+  .page-desc {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #94a3b8;
+  }
 }
 </style>

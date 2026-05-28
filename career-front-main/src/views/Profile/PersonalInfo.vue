@@ -1,17 +1,30 @@
 <template>
   <div class="personal-info-report">
-    <div v-if="reportStatus !== 'ready'" class="custom-loading-overlay">
-      <InteractiveLoading
-        title="AI 深度诊断中"
-        description="正在融合画像数据与诊断模型，生成个性化分析报告"
-        statusText="Career Pilot 诊断引擎运行中"
-        :steps="loadingSteps"
-        :currentStep="currentLoadingStep"
-        :progress="loadingProgress"
-        :showProgress="true"
-        :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书']"
-      />
+    <!-- 顶部标题卡片 -->
+    <div class="action-bar glass-card">
+      <div class="action-left">
+        <h2 class="page-title">
+          <el-icon><User /></el-icon>
+          个人信息画像
+        </h2>
+        <p class="page-desc">AI 深度分析你的个人能力画像，生成专属诊断报告</p>
+      </div>
     </div>
+
+    <transition name="loading-fade">
+      <div v-if="reportStatus !== 'ready'" class="loading-section">
+        <InteractiveLoading
+          title="AI 深度诊断中"
+          description="正在融合画像数据与诊断模型，生成个性化分析报告"
+          statusText="Career Pilot 诊断引擎运行中"
+          :steps="loadingSteps"
+          :currentStep="currentLoadingStep"
+          :progress="loadingProgress"
+          :showProgress="true"
+          :orbLabels="['技能', '创新', '学习', '实习', '抗压', '沟通', '证书']"
+        />
+      </div>
+    </transition>
 
     <template v-else>
       <section class="diagnosis-hero">
@@ -138,7 +151,7 @@ let _cachedResults = null
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { School, Message, MagicStick, Refresh, DataAnalysis, Aim } from '@element-plus/icons-vue'
+import { School, Message, MagicStick, Refresh, DataAnalysis, Aim, User } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { currentRadarData, dimensionDetailsRaw } from './profileState.js'
 import { diagnosisApi } from '@/api/diagnosis'
@@ -614,6 +627,18 @@ const initWordCloud = () => {
   overflow: hidden;
 }
 
+.loading-section {
+  height: 65vh;
+  min-height: 500px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.loading-fade-enter-active,
+.loading-fade-leave-active { transition: opacity 0.5s ease; }
+.loading-fade-enter-from,
+.loading-fade-leave-to { opacity: 0; }
+
 .personal-info-report {
   display: flex;
   flex-direction: column;
@@ -902,6 +927,44 @@ const initWordCloud = () => {
   cursor: pointer;
   text-align: left;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* 顶部操作栏 */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+
+  .page-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    .el-icon { color: #5098f9; font-size: 24px; }
+  }
+  .page-desc {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.dimension-chip {
 
   &:hover {
     transform: translateY(-2px);

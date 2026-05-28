@@ -662,8 +662,8 @@ watch(currentRadarData, (newVal, oldVal) => {
 
 /* 加载状态 - 自适应容器大小 */
 .loading-section {
-  flex: 1;
-  min-height: 400px;
+  height: 65vh;
+  min-height: 500px;
   border-radius: 20px;
   overflow: hidden;
 }
