@@ -93,14 +93,14 @@ let particles = []
 
 // 浮动球数据
 const orbConfigs = [
-  { size: 70, baseX: 0.1, baseY: 0.15, speed: 0.8, gradient: 'linear-gradient(135deg, #f9d1c0 0%, #fcfbe3 100%)' },
-  { size: 55, baseX: 0.85, baseY: 0.2, speed: 1.0, gradient: 'linear-gradient(135deg, #abcff6 0%, #c4efeb 100%)' },
-  { size: 80, baseX: 0.08, baseY: 0.65, speed: 0.6, gradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)' },
-  { size: 45, baseX: 0.88, baseY: 0.7, speed: 1.2, gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-  { size: 60, baseX: 0.5, baseY: 0.08, speed: 0.9, gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
-  { size: 50, baseX: 0.35, baseY: 0.8, speed: 1.1, gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
-  { size: 65, baseX: 0.92, baseY: 0.45, speed: 0.7, gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
-  { size: 58, baseX: 0.15, baseY: 0.4, speed: 0.95, gradient: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)' },
+  { size: 70, baseX: 0.1, baseY: 0.15, speed: 0.8, gradient: 'linear-gradient(135deg, rgba(249,209,192,0.4) 0%, rgba(252,251,227,0.4) 100%)' },
+  { size: 55, baseX: 0.85, baseY: 0.2, speed: 1.0, gradient: 'linear-gradient(135deg, rgba(171,207,246,0.4) 0%, rgba(196,239,235,0.4) 100%)' },
+  { size: 80, baseX: 0.08, baseY: 0.65, speed: 0.6, gradient: 'linear-gradient(135deg, rgba(161,196,253,0.4) 0%, rgba(194,233,251,0.4) 100%)' },
+  { size: 45, baseX: 0.88, baseY: 0.7, speed: 1.2, gradient: 'linear-gradient(135deg, rgba(240,147,251,0.3) 0%, rgba(245,87,108,0.3) 100%)' },
+  { size: 60, baseX: 0.5, baseY: 0.08, speed: 0.9, gradient: 'linear-gradient(135deg, rgba(79,172,254,0.35) 0%, rgba(0,242,254,0.35) 100%)' },
+  { size: 50, baseX: 0.35, baseY: 0.8, speed: 1.1, gradient: 'linear-gradient(135deg, rgba(67,233,123,0.3) 0%, rgba(56,249,215,0.3) 100%)' },
+  { size: 65, baseX: 0.92, baseY: 0.45, speed: 0.7, gradient: 'linear-gradient(135deg, rgba(250,112,154,0.3) 0%, rgba(254,225,64,0.3) 100%)' },
+  { size: 58, baseX: 0.15, baseY: 0.4, speed: 0.95, gradient: 'linear-gradient(135deg, rgba(161,140,209,0.35) 0%, rgba(251,194,235,0.35) 100%)' },
 ]
 
 const orbs = reactive(
@@ -112,7 +112,7 @@ const orbs = reactive(
     vx: (Math.random() - 0.5) * 2,
     vy: (Math.random() - 0.5) * 2,
     scale: 1,
-    opacity: 0.7 + Math.random() * 0.3,
+    opacity: 0.35 + Math.random() * 0.2,
     isDodging: false,
     floatPhase: Math.random() * Math.PI * 2,
     rotation: Math.random() * 360,
@@ -343,22 +343,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    0 8px 32px rgba(31, 38, 135, 0.08);
+    inset 0 1px 2px rgba(255, 255, 255, 0.6),
+    0 8px 40px rgba(31, 38, 135, 0.05);
   cursor: default;
   will-change: transform;
 
   &::before {
     content: '';
     position: absolute;
-    inset: -15%;
+    inset: -25%;
     border-radius: 50%;
     background: inherit;
-    filter: blur(12px);
-    opacity: 0.4;
+    filter: blur(20px);
+    opacity: 0.6;
     z-index: -1;
   }
 }
@@ -366,7 +366,7 @@ onUnmounted(() => {
 .orb-label {
   font-size: 11px;
   font-weight: 600;
-  color: #5098f9;
+  color: rgba(80, 152, 249, 0.6);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
   user-select: none;
 }
