@@ -1,14 +1,12 @@
 <template>
   <div class="personal-info-report">
-    <!-- 顶部标题卡片 -->
-    <div class="action-bar glass-card">
-      <div class="action-left">
-        <h2 class="page-title">
-          <el-icon><User /></el-icon>
-          个人信息画像
-        </h2>
-        <p class="page-desc">职能助手深度分析你的个人能力画像，生成专属诊断报告</p>
-      </div>
+    <!-- 顶部标题栏 -->
+    <div class="action-bar">
+      <h2 class="page-title">
+        <el-icon><User /></el-icon>
+        个人信息画像
+      </h2>
+      <p class="page-desc">职能助手深度分析你的个人能力画像，生成专属诊断报告</p>
     </div>
 
     <transition name="loading-fade">
@@ -26,7 +24,7 @@
       </div>
     </transition>
 
-    <template v-else>
+    <template v-if="reportStatus === 'ready'">
       <section class="diagnosis-hero">
         <div class="hero-copy">
           <div class="eyebrow">
@@ -628,8 +626,8 @@ const initWordCloud = () => {
 }
 
 .loading-section {
-  height: 65vh;
-  min-height: 500px;
+  height: 78vh;
+  min-height: 580px;
   border-radius: 20px;
   overflow: hidden;
 }
@@ -931,38 +929,31 @@ const initWordCloud = () => {
 
 /* 顶部操作栏 */
 .action-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+  padding: 14px 20px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(240, 248, 255, 0.3));
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 
   .page-title {
     margin: 0;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: #1e293b;
     display: flex;
     align-items: center;
-    gap: 10px;
-    .el-icon { color: #5098f9; font-size: 24px; }
+    gap: 8px;
+    .el-icon { color: #5098f9; font-size: 22px; }
   }
   .page-desc {
-    margin: 6px 0 0;
+    margin: 5px 0 0;
     font-size: 13px;
     color: #94a3b8;
+    font-weight: 500;
   }
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.4) !important;
-  backdrop-filter: blur(20px) saturate(1.1);
-  -webkit-backdrop-filter: blur(20px) saturate(1.1);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-  height: 100%;
-  transition: all 0.3s ease;
-}
 
 .dimension-chip {
 

@@ -292,12 +292,13 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 500px;
+  min-height: 580px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   border-radius: 20px;
+  padding: 32px;
   background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 50%, #f5f0ff 100%);
 }
 
@@ -378,25 +379,25 @@ onUnmounted(() => {
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border-radius: 24px;
-  padding: clamp(20px, 5%, 40px) clamp(24px, 6%, 50px);
+  padding: clamp(18px, 4%, 32px) clamp(22px, 5%, 40px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 20px 60px rgba(31, 38, 135, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   text-align: center;
-  max-width: 480px;
+  max-width: 460px;
   width: 100%;
   margin: clamp(8px, 2%, 20px);
 }
 
 .loading-animation {
   position: relative;
-  width: clamp(80px, 15vw, 120px);
-  height: clamp(80px, 15vw, 120px);
-  margin: 0 auto clamp(16px, 3vw, 28px);
+  width: clamp(100px, 18vw, 150px);
+  height: clamp(100px, 18vw, 150px);
+  margin: 0 auto clamp(20px, 3vw, 32px);
 }
 
 .loading-title {
-  margin: 0 0 clamp(4px, 1vw, 8px);
-  font-size: clamp(16px, 2.5vw, 20px);
+  margin: 0 0 clamp(6px, 1.2vw, 10px);
+  font-size: clamp(18px, 2.8vw, 24px);
   font-weight: 700;
   color: #1e293b;
 }
@@ -467,7 +468,7 @@ onUnmounted(() => {
 }
 
 .ring-3 {
-  inset: -10px;
+  inset: -14px;
   background: conic-gradient(from 240deg, #4facfe, rgba(79, 172, 254, 0.1), #43e97b, rgba(67, 233, 123, 0.1), #4facfe);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #fff calc(100% - 1.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #fff calc(100% - 1.5px));
@@ -477,36 +478,36 @@ onUnmounted(() => {
 
 .satellite-dot {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #5098f9;
-  box-shadow: 0 0 8px rgba(80, 152, 249, 0.6);
-  top: -3px;
+  box-shadow: 0 0 10px rgba(80, 152, 249, 0.6);
+  top: -4px;
   left: 50%;
-  margin-left: -3px;
+  margin-left: -4px;
 }
 
 .sat-2 {
   background: #764ba2;
-  box-shadow: 0 0 8px rgba(118, 75, 162, 0.6);
+  box-shadow: 0 0 10px rgba(118, 75, 162, 0.6);
   top: auto;
-  bottom: -3px;
+  bottom: -4px;
   left: 50%;
 }
 
 .sat-3 {
   background: #4facfe;
-  box-shadow: 0 0 8px rgba(79, 172, 254, 0.6);
+  box-shadow: 0 0 10px rgba(79, 172, 254, 0.6);
   top: 50%;
-  left: -3px;
+  left: -4px;
   margin-left: 0;
-  margin-top: -3px;
+  margin-top: -4px;
 }
 
 .core-icon {
   position: absolute;
-  inset: 24px;
+  inset: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -517,7 +518,7 @@ onUnmounted(() => {
 }
 
 .core-icon .el-icon {
-  font-size: 36px;
+  font-size: 42px;
   color: white;
 }
 

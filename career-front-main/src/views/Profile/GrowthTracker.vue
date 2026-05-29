@@ -1,7 +1,7 @@
 <template>
   <div class="growth-tracking-center fade-in">
     <!-- 顶部标题卡片 -->
-    <div class="action-bar glass-card">
+    <div class="action-bar">
       <div class="action-left">
         <h2 class="page-title">
           <el-icon><TrendCharts /></el-icon>
@@ -1297,33 +1297,41 @@ watch(isCoachingOpen, (open) => {
 
 /* 加载状态 - 自适应容器大小 */
 .loading-section {
-  height: 65vh;
-  min-height: 500px;
+  height: 78vh;
+  min-height: 580px;
   border-radius: 20px;
   overflow: hidden;
 }
 
 /* 顶部操作栏 */
 .action-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+  padding: 14px 20px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(240, 248, 255, 0.3));
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  margin-bottom: 20px;
 
   .page-title {
     margin: 0;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: #1e293b;
     display: flex;
     align-items: center;
-    gap: 10px;
-    .el-icon { color: #5098f9; font-size: 24px; }
+    gap: 8px;
+    line-height: 1.4;
+    word-break: break-word;
+    .el-icon { color: #5098f9; font-size: 22px; flex-shrink: 0; }
   }
   .page-desc {
-    margin: 6px 0 0;
+    margin: 5px 0 0;
     font-size: 13px;
     color: #94a3b8;
+    font-weight: 500;
+    line-height: 1.5;
+    word-break: break-word;
   }
 }
 </style>
