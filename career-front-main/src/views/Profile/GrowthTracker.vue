@@ -14,9 +14,9 @@
     <!-- 加载状态 - 与人岗匹配一致 -->
     <div v-if="pageLoading" class="loading-section">
       <InteractiveLoading
-        title="智能分析中"
+        title="分析中"
         description="正在融合多维数据，为你生成个性化学习计划"
-        statusText="Career Pilot 引擎运行中"
+        statusText="职能助手引擎运行中"
         :steps="loadingSteps"
         :currentStep="currentLoadingStep"
         :progress="loadingProgress"
@@ -33,7 +33,7 @@
         </div>
         <div class="agent-message">
           <div class="agent-header-row">
-            <span class="agent-name">Career Pilot</span>
+            <span class="agent-name">职能助手</span>
             <el-tag v-if="targetPosition" size="small" effect="plain" type="primary">{{ targetPosition }}</el-tag>
           </div>
           <p class="message-text">{{ aiAnalysis }}</p>
@@ -120,7 +120,7 @@
         <div class="todo-content">
           <div class="todo-title-row">
             <span class="todo-text">{{ todo.text }}</span>
-            <el-tag v-if="todo.isAI" size="small" type="warning" effect="plain" class="ai-tag">AI 建议</el-tag>
+            <el-tag v-if="todo.isAI" size="small" type="warning" effect="plain" class="ai-tag">助手建议</el-tag>
           </div>
           
           <div class="todo-details">
@@ -147,7 +147,7 @@
 >
       <div class="floating-avatar-btn" @mousedown="handleMouseDown">
         <el-icon class="pulse-icon"><MagicStick /></el-icon>
-        <span class="avatar-label">智能辅导</span>
+        <span class="avatar-label">职能助手</span>
       </div>
 
       <el-card class="coaching-dialog glass-card">
@@ -164,7 +164,7 @@
     <div v-for="(msg, idx) in chatHistory" :key="idx" :class="msg.role === 'user' ? 'user-msg-wrapper' : 'bot-msg-wrapper'">
       <div v-if="msg.role === 'assistant'" class="bot-avatar-mini"><el-icon><MagicStick /></el-icon></div>
       <div :class="msg.role === 'user' ? 'user-content' : 'bot-content'">
-        <span class="bot-info" v-if="msg.role === 'assistant'">Career Pilot</span>
+        <span class="bot-info" v-if="msg.role === 'assistant'">职能助手</span>
         <span class="bot-info" v-else>我</span>
         <div :class="msg.role === 'user' ? 'user-prompt' : 'bot-prompt'">{{ msg.content }}</div>
       </div>
@@ -173,7 +173,7 @@
     <div v-if="isCoachingLoading" class="bot-msg-wrapper">
       <div class="bot-avatar-mini"><el-icon><MagicStick /></el-icon></div>
       <div class="bot-content">
-        <span class="bot-info">Career Pilot</span>
+        <span class="bot-info">职能助手</span>
         <div class="bot-prompt typing-indicator">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
         </div>
@@ -748,7 +748,7 @@ const sendCoachMessage = async () => {
     chatHistory.value.push({ role: 'assistant', content: reply || '抱歉，暂时无法回复。' })
   } catch (err) {
     console.error('[GrowthCoach] Send failed:', err)
-    chatHistory.value.push({ role: 'assistant', content: '抱歉，AI 服务暂时不可用，请稍后再试。' })
+    chatHistory.value.push({ role: 'assistant', content: '抱歉，职能助手暂时不可用，请稍后再试。' })
   } finally {
     isCoachingLoading.value = false
     scrollChatToBottom()

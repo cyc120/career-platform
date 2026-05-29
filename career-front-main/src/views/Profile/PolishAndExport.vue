@@ -5,7 +5,7 @@
       <div class="report-display-container" v-loading="pageLoading">
         <div class="paper-header">
           <div class="title-text">职业分析报告</div>
-          <div class="paper-meta">最后更新：{{ lastUpdateTime }} | 导师：AI Career Pilot</div>
+          <div class="paper-meta">最后更新：{{ lastUpdateTime }} | 导师：职能助手</div>
         </div>
 
         <div class="paper-body">
@@ -15,13 +15,13 @@
               <div class="spinner-ring delay-1"></div>
               <div class="spinner-ring delay-2"></div>
             </div>
-            <p class="gen-text">AI 正在分析你的个人数据并生成报告...</p>
+            <p class="gen-text">职能助手正在分析你的个人数据并生成报告...</p>
             <p class="gen-sub">聚合画像、匹配、学习计划、职业规划等模块数据</p>
           </div>
           <div v-else-if="reportContent" class="report-text">{{ reportContent }}</div>
           <div v-else class="empty-hint">
             <el-icon><Document /></el-icon>
-            <p>点击"生成报告"按钮，AI 将聚合你的所有数据生成完整职业分析报告</p>
+            <p>点击"生成报告"按钮，职能助手将聚合你的所有数据生成完整职业分析报告</p>
           </div>
         </div>
       </div>
@@ -29,7 +29,7 @@
       <div class="control-panel">
         <div class="ai-assistant-box shadow-sm">
           <div class="panel-label">
-            <el-icon><MagicStick /></el-icon> 智能润色指令
+            <el-icon><MagicStick /></el-icon> 润色指令
           </div>
 
           <div class="instruction-input-wrapper">
@@ -85,7 +85,7 @@
             >
               <div class="card-top">
                 <span class="version-tag" :class="item.type === 'user' ? 'type-user' : 'type-ai'">
-                  {{ item.type === 'user' ? '手动快照' : 'AI 润色' }}
+                  {{ item.type === 'user' ? '手动快照' : '助手润色' }}
                 </span>
                 <span class="time">{{ item.time }}</span>
               </div>
@@ -156,8 +156,9 @@ const handleGenerate = async () => {
     } else {
       ElMessage.warning('报告内容为空')
     }
-  } catch {
-    ElMessage.error('报告生成失败，请重试')
+  } catch (err) {
+    const msg = err.response?.data?.detail || '报告生成失败，请重试'
+    ElMessage.warning(msg)
   } finally {
     generating.value = false
   }

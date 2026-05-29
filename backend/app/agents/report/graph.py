@@ -42,10 +42,16 @@ class ReportAgent(AgentBase):
 
         # generate path: load -> generate -> format -> END
         # polish path: load (skip) -> polish -> format -> END
+        # error path: load -> END (no data to generate)
+        def after_load(state):
+            if state.get("error"):
+                return END
+            return "generate_report" if state.get("action") == "generate" else "polish_report"
+
         builder.add_conditional_edges(
             "load_all_data",
-            lambda state: "generate_report" if state.get("action") == "generate" else "polish_report",
-            {"generate_report": "generate_report", "polish_report": "polish_report"},
+            after_load,
+            {"generate_report": "generate_report", "polish_report": "polish_report", END: END},
         )
         builder.add_edge("generate_report", "format_report")
         builder.add_edge("polish_report", "format_report")

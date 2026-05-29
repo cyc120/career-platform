@@ -4,14 +4,14 @@
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-section">
         <InteractiveLoading
-          title="智能匹配分析中"
+          title="匹配分析中"
           description="正在融合多维数据，为你精准匹配最佳岗位"
-          statusText="AI 匹配引擎运行中"
+          statusText="职能助手匹配引擎运行中"
           :steps="loadingSteps"
           :currentStep="currentStep"
           :progress="progressPercent"
           :showProgress="true"
-          :orbLabels="['前端', '后端', 'AI', '数据', '产品', '安全', '运维', '设计']"
+          :orbLabels="['前端', '后端', '算法', '数据', '产品', '安全', '运维', '设计']"
         />
       </div>
 
@@ -22,7 +22,7 @@
             <el-icon :size="64"><Briefcase /></el-icon>
           </div>
           <h3>暂无匹配数据</h3>
-          <p>请先在「个人信息」中完成 AI 对话分析，生成个人画像后系统将自动进行匹配</p>
+          <p>请先在「个人信息」中完成对话分析，生成个人画像后系统将自动进行匹配</p>
         </div>
       </div>
 
@@ -113,7 +113,7 @@
           <div class="glass-card summary-card accent-orange">
             <h3 class="card-title">
               <el-icon><ChatDotRound /></el-icon>
-              AI 匹配简评
+              匹配简评
             </h3>
             <p class="summary-text">{{ selectedJob.summary || '暂无简评' }}</p>
           </div>
@@ -267,16 +267,17 @@ const dimensionList = computed(() => {
 })
 
 // ==================== 匹配逻辑 ====================
-const startMatch = async ({ resetLock = false } = {}) => {
+const startMatch = async () => {
   loading.value = true
   rankedResults.value = []
   selectedIndex.value = 0
-  if (resetLock) {
-    lockedJobKey.value = ''
-    hasMatchData.value = false
-    parentSelectedJob.value = null
-    matchingApi.clearSelectedJob().catch(() => {})
-  }
+
+  // 每次匹配自动清除旧锁定
+  lockedJobKey.value = ''
+  hasMatchData.value = false
+  parentSelectedJob.value = null
+  matchingApi.clearSelectedJob().catch(() => {})
+
   clearCache()
   // 清除成长追踪缓存，触发重新加载
   sessionStorage.removeItem('growth_tracker_cache')
@@ -337,7 +338,6 @@ const startMatch = async ({ resetLock = false } = {}) => {
     await nextTick()
     requestAnimationFrame(() => {
       initRadarChart()
-      if (!resetLock) restoreLockState()
     })
   } catch (err) {
     console.error('[JobMatch] match failed:', err)
@@ -575,7 +575,6 @@ onMounted(() => {
     selectedIndex.value = cached.index || 0
     nextTick(() => {
       requestAnimationFrame(() => initRadarChart())
-      restoreLockState()
     })
   } else if (currentRadarData.value && currentRadarData.value.some(v => v > 0) && rankedResults.value.length === 0) {
     // Auto-trigger matching when profile data exists and no valid cache
@@ -605,7 +604,7 @@ watch(currentRadarData, (newVal, oldVal) => {
       radarInstance.dispose()
       radarInstance = null
     }
-    nextTick(() => startMatch({ resetLock: true }))
+    nextTick(() => startMatch())
   }
 })
 </script>

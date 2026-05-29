@@ -52,22 +52,29 @@
             @mouseleave="hoveredJob = null"
             @click="goToJobDetail(job.id)"
           >
+            <div class="card-accent"></div>
             <div class="card-main">
               <div class="title-row">
                 <span class="job-name">{{ job.title }}</span>
-                <span class="job-salary">{{ job.salary }}</span>
+                <span class="job-salary-pill">{{ job.salary }}</span>
               </div>
               <div class="company-row">
+                <span class="comp-logo">{{ job.company.charAt(0) }}</span>
                 <span class="comp-name">{{ job.company }}</span>
-                <span class="divider">|</span>
-                <span class="comp-scale">{{ job.scale || '大厂' }}</span>
+                <span class="comp-divider"></span>
+                <el-icon class="comp-city-icon"><Location /></el-icon>
+                <span class="comp-city">{{ job.city || '--' }}</span>
+                <span class="comp-scale-tag">{{ job.scale || '大厂' }}</span>
               </div>
               <div class="tag-row">
-                <el-tag v-for="tag in job.tags" :key="tag" size="small" type="info" effect="plain" class="mini-tag">
-                  {{ tag }}
-                </el-tag>
+                <span
+                  v-for="(tag, idx) in job.tags"
+                  :key="tag"
+                  :class="['premium-tag', `tag-variant-${idx % 4}`]"
+                >{{ tag }}</span>
               </div>
             </div>
+            <div class="card-divider"></div>
             <div class="card-footer">
               <span class="time-stamp">{{ job.time || '1 小时前发布' }}</span>
               <span class="match-badge">职途无限</span>
@@ -83,29 +90,46 @@
 
       <aside :class="['preview-panel', { 'is-solid': hoveredJob }]">
         <div v-if="!hoveredJob" class="preview-default">
-          <el-icon class="guide-icon"><Pointer /></el-icon>
-          <p>悬停查看职位画像预览<br/>点击进入详细页面</p>
+          <div class="preview-icon-ring">
+            <el-icon class="guide-icon"><Pointer /></el-icon>
+          </div>
+          <p class="preview-hint-title">职位画像预览</p>
+          <p class="preview-hint-desc">悬停左侧卡片查看详情<br/>点击进入深度画像页面</p>
         </div>
         <div v-else class="preview-active">
           <div class="preview-header">
             <div class="logo-placeholder">{{ hoveredJob.company.charAt(0) }}</div>
             <div class="title-info">
-              <h3>{{ hoveredJob.title }}</h3>
+              <h3 class="preview-job-title">{{ hoveredJob.title }}</h3>
               <p class="company-name">{{ hoveredJob.company }}</p>
             </div>
           </div>
           <div class="highlight-box">
             <div class="h-item">
-              <span class="label">薪资</span>
+              <span class="label">薪资范围</span>
               <span class="val orange">{{ hoveredJob.salary }}</span>
             </div>
-            <div class="h-item"><span class="label">地点</span><span class="val">{{ hoveredJob.city || '北京' }}</span></div>
+            <div class="h-item">
+              <span class="label">工作城市</span>
+              <span class="val">{{ hoveredJob.city || '--' }}</span>
+            </div>
           </div>
+          <div class="preview-tags">
+            <span
+              v-for="(tag, idx) in (hoveredJob.tags || [])"
+              :key="tag"
+              :class="['preview-tag', `ptag-${idx % 3}`]"
+            >{{ tag }}</span>
+          </div>
+          <div class="preview-divider"></div>
           <div class="preview-section">
             <h4 class="section-title">职位描述摘要</h4>
-            <div class="desc-text">{{ hoveredJob.description || '核心业务系统开发...' }}</div>
+            <div class="desc-text">{{ hoveredJob.description || '暂无详细描述，点击卡片查看完整画像' }}</div>
           </div>
-          <div class="click-tip">点击卡片查看深度画像</div>
+          <div class="click-tip">
+            <el-icon><Pointer /></el-icon>
+            点击卡片查看深度画像
+          </div>
         </div>
       </aside>
     </main>
@@ -129,7 +153,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, ArrowDown, Pointer, Loading } from '@element-plus/icons-vue'
+import { Search, ArrowDown, Pointer, Loading, Location } from '@element-plus/icons-vue'
 import { jobsApi } from '@/api/jobs'
 
 const router = useRouter()
@@ -330,6 +354,11 @@ const filterCategories = [
   { type: 'city', label: '城市' }
 ]
 
+const dialogTitle = computed(() => {
+  const cat = filterCategories.find(c => c.type === activeFilterType.value)
+  return cat ? `筛选${cat.label}` : '筛选'
+})
+
 const filterOptions = {
   industry: [
     { value: '计算机软件', label: '计算机软件' },
@@ -515,7 +544,7 @@ const filterOptions = {
 .job-explorer {
   padding: 30px 60px;
   width: 100%;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 64px);
   
   /* 🌟 核心修改：增加色彩饱和度，从左上角的深冰蓝色向右下角的纯白过渡 */
   background: 
@@ -614,7 +643,7 @@ const filterOptions = {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -623,157 +652,424 @@ const filterOptions = {
 }
 
 .elegant-job-card {
-  background: #fff;
-  border-radius: 16px; /* 🎨 调大圆角：更润、更现代 */
-  padding: 24px;
-  margin-bottom: 16px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  border: 1px solid rgba(255, 255, 255, 0.7) !important; /* 白色边框 */
-  box-shadow: 
-    0 4px 20px rgba(0, 0, 0, 0.03), 
-    inset 0 0 12px rgba(255, 255, 255, 0.5) !important; /* 关键：内发光 */
-  /* 🌟 核心交互反馈：重力反馈感美化 (Hover) */
-  &:hover, &.is-active {
-    transform: translateY(-5px); /* 🎨 向上浮起，更有灵性 */
-    box-shadow: 
-      0 20px 40px rgba(64, 158, 255, 0.1), 
-      0 0 0 2px rgba(64, 158, 255, 0.05) !important; /* 悬停时的呼吸圈 */
-    border-color: rgba(64, 158, 255, 0.2); /* 🌟 悬停时增加蓝色发光描边 */
-  }
-
-  .title-row {
-    display: flex; justify-content: space-between; margin-bottom: 8px;
-    .job-name { font-size: 18px; font-weight: bold; color: #303133; }
-    /* 🌟 匹配度色彩心理：使用珊瑚橙引导 */
-    .job-salary { font-size: 17px; font-weight: bold; color: #f77c38; /* 珊瑚橙 */ }
-  }
-
-  .company-row { font-size: 14px; color: #909399; margin-bottom: 12px; .divider { margin: 0 8px; color: #eee; } }
-  
-  /* 🌟 标签精致化：药丸样式微胶囊 */
-  .tag-row { display: flex; gap: 8px; margin-bottom: 15px; .mini-tag { font-size: 11px; padding: 2px 8px; background: #fdf6ec; color: #e6a23c; border-radius: 4px; } }
-  
-  .card-footer { display: flex; justify-content: space-between; font-size: 12px; color: #abb2bb; .match-badge { color: #67C23A; font-weight: bold; } }
-  animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-/* 只针对前 6 个（首屏渲染）设置延迟，后续滚动加载的保持一致 */
-.elegant-job-card:nth-child(1) { animation-delay: 0.05s; }
-.elegant-job-card:nth-child(2) { animation-delay: 0.1s; }
-.elegant-job-card:nth-child(3) { animation-delay: 0.15s; }
-.elegant-job-card:nth-child(4) { animation-delay: 0.2s; }
-.elegant-job-card:nth-child(5) { animation-delay: 0.25s; }
-.elegant-job-card:nth-child(6) { animation-delay: 0.3s; }
-
-/* 替换原本 .match-badge 或直接添加 */
-.match-badge {
-  background: rgba(103, 194, 58, 0.08); /* 极淡的 AI 绿 */
-  color: #67C23A !important;
-  padding: 4px 12px;
-  border-radius: 8px;
-  font-weight: bold;
-  font-size: 12px;
-  border: 1px solid rgba(103, 194, 58, 0.2);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  
-  /* 前置一个小圆点，增加科技感 */
-  &::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    background: #67C23A;
-    border-radius: 50%;
-    box-shadow: 0 0 6px #67C23A; /* 呼吸灯效果 */
-  }
-}
-
-/* --- D. 右侧预览面板（重点美化） --- */
-.preview-panel {
-  width: 400px;
-  border-radius: 24px;
-  padding: 30px;
-  display: flex;
-  flex-direction: column;
-  
-  /* 🌟 核心：添加过渡动画 */
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); 
-  
-  /* 1. 默认状态：半透明毛玻璃 */
-  background: rgba(255, 255, 255, 0.45) !important;
+  position: relative;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,251,255,0.9) 100%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.03);
+  border-radius: 18px;
+  padding: 0;
+  margin-bottom: 14px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(64, 158, 255, 0.04) !important;
 
-  /* 2. 🌟 内容显示状态：颜色变实 */
-  &.is-solid {
-    background: rgba(255, 255, 255, 1) !important; /* 变为纯白不透明 */
-    backdrop-filter: blur(0px); /* 变实后不需要模糊了 */
-    border: 1px solid rgba(64, 158, 255, 0.1) !important; /* 边缘微微发蓝 */
-    box-shadow: 0 25px 50px rgba(64, 158, 255, 0.08); /* 投影更有呼吸感 */
+  /* 左侧渐变装饰条 */
+  .card-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, #409eff 0%, #8c97f6 50%, #c084fc 100%);
+    border-radius: 4px 0 0 4px;
+    opacity: 0.6;
+    transition: all 0.35s ease;
+  }
+
+  /* 🌟 悬停效果：浮起 + 发光 + 装饰条高亮 */
+  &:hover, &.is-active {
+    transform: translateY(-4px) scale(1.005);
+    box-shadow:
+      0 8px 30px rgba(64, 158, 255, 0.12),
+      0 20px 48px rgba(140, 151, 246, 0.08),
+      0 0 0 1px rgba(64, 158, 255, 0.1) !important;
+    border-color: rgba(64, 158, 255, 0.15) !important;
+
+    .card-accent {
+      opacity: 1;
+      width: 5px;
+      box-shadow: 0 0 12px rgba(64, 158, 255, 0.3);
+    }
+  }
+
+  .card-main {
+    padding: 22px 24px 14px 28px;
+  }
+
+  /* 标题行 */
+  .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+
+    .job-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1a2332;
+      letter-spacing: 0.3px;
+    }
+
+    /* 薪资胶囊 */
+    .job-salary-pill {
+      font-size: 14px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff4e6 0%, #ffe8cc 100%);
+      color: #f77c38;
+      padding: 4px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(247, 124, 56, 0.15);
+      white-space: nowrap;
+    }
+  }
+
+  /* 公司行 */
+  .company-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #86909c;
+    margin-bottom: 14px;
+
+    .comp-logo {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #e8f0fe 0%, #d4e4ff 100%);
+      color: #409eff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .comp-name {
+      color: #4e5969;
+      font-weight: 500;
+    }
+
+    .comp-divider {
+      width: 1px;
+      height: 12px;
+      background: #e5e6eb;
+      flex-shrink: 0;
+    }
+
+    .comp-city-icon {
+      font-size: 13px;
+      color: #c9cdd4;
+      flex-shrink: 0;
+    }
+
+    .comp-city {
+      color: #86909c;
+      font-size: 13px;
+    }
+
+    .comp-scale-tag {
+      margin-left: auto;
+      font-size: 11px;
+      color: #a0a4ad;
+      background: #f7f8fa;
+      padding: 2px 10px;
+      border-radius: 10px;
+      border: 1px solid #f0f1f2;
+    }
+  }
+
+  /* 多色标签 */
+  .tag-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .premium-tag {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+
+      &.tag-variant-0 { background: #e8f4fd; color: #409eff; }
+      &.tag-variant-1 { background: #f0e8fd; color: #8c97f6; }
+      &.tag-variant-2 { background: #e8fdf0; color: #52c41a; }
+      &.tag-variant-3 { background: #fdf6ec; color: #e6a23c; }
+    }
+  }
+
+  /* 渐变分隔线 */
+  .card-divider {
+    height: 1px;
+    margin: 0 24px 0 28px;
+    background: linear-gradient(90deg, transparent 0%, #e8ecf0 20%, #e8ecf0 80%, transparent 100%);
+  }
+
+  /* 底部 */
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px 14px 28px;
+    font-size: 12px;
+    color: #bfbfbf;
+
+    .time-stamp {
+      letter-spacing: 0.3px;
+    }
+  }
+
+  animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* 首屏卡片错开入场 */
+.elegant-job-card:nth-child(1) { animation-delay: 0.04s; }
+.elegant-job-card:nth-child(2) { animation-delay: 0.08s; }
+.elegant-job-card:nth-child(3) { animation-delay: 0.12s; }
+.elegant-job-card:nth-child(4) { animation-delay: 0.16s; }
+.elegant-job-card:nth-child(5) { animation-delay: 0.20s; }
+.elegant-job-card:nth-child(6) { animation-delay: 0.24s; }
+
+/* 匹配徽章 */
+.match-badge {
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.08) 0%, rgba(103, 194, 58, 0.04) 100%);
+  color: #67C23A !important;
+  padding: 3px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 11px;
+  border: 1px solid rgba(103, 194, 58, 0.15);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  &::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    background: #67C23A;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(103, 194, 58, 0.4);
   }
 }
 
-/* 预览内容展示时的渐显动画 */
-.preview-active {
-  animation: fadeIn 0.4s ease-out;
+/* --- D. 右侧预览面板 --- */
+.preview-panel {
+  width: 400px;
+  border-radius: 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* 默认状态：半透明毛玻璃 */
+  background: linear-gradient(160deg, rgba(255,255,255,0.55) 0%, rgba(240,245,255,0.4) 100%) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.03),
+    0 2px 8px rgba(64, 158, 255, 0.03);
+
+  /* 内容显示状态 */
+  &.is-solid {
+    background: linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(248,251,255,0.95) 100%) !important;
+    backdrop-filter: blur(0px);
+    border: 1px solid rgba(64, 158, 255, 0.08) !important;
+    box-shadow:
+      0 12px 36px rgba(64, 158, 255, 0.08),
+      0 4px 12px rgba(0, 0, 0, 0.03);
+  }
 }
 
+/* --- 默认空态 --- */
+.preview-default {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+
+  .preview-icon-ring {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(64,158,255,0.08) 0%, rgba(140,151,246,0.08) 100%);
+    border: 1px solid rgba(64,158,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+
+    .guide-icon {
+      font-size: 32px;
+      color: #409eff;
+      opacity: 0.5;
+    }
+  }
+
+  .preview-hint-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #4e5969;
+    margin-bottom: 8px;
+  }
+
+  .preview-hint-desc {
+    font-size: 13px;
+    color: #a0a4ad;
+    line-height: 1.8;
+  }
+}
+
+/* --- 悬停预览态 --- */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.preview-default {
-  height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: #909399;
-  .guide-icon {
-    font-size: 56px;
-    color: #409EFF;
-    margin-bottom: 20px;
-    opacity: 0.4; /* 图标也调透明，显得更轻盈 */
-  }
-  
-  p {
-    line-height: 1.8;
-    font-size: 15px;
-    letter-spacing: 0.5px;
-  }
-}
-
 .preview-active {
+  padding: 28px;
+  animation: fadeIn 0.35s ease-out;
+
   .preview-header {
-    display: flex; gap: 15px; align-items: center; margin-bottom: 25px;
-    /* 公司 Logo 圆角矩形占位 */
-.logo-placeholder {
-  width: 64px;
-  height: 64px;
-  /* 使用带有深度的蓝色渐变 */
-  background: linear-gradient(135deg, #409EFF 0%, #2a7cdb 100%) !important;
-  color: #ffffff;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  font-weight: bold;
-  /* 增加一个外侧的浅蓝发光层 */
-  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.2);
-}
-  }
-  
-  /* 信息层级视觉重组：网格化统计区域 */
-  .highlight-box {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; padding: 15px; background: #f9fbff; border-radius: 12px;
-    .label { font-size: 12px; color: #909399; display: block; margin-bottom: 4px; }
-    .val { font-size: 16px; font-weight: bold; color: #303133; &.orange { color: #f77c38; } }
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 24px;
+
+    .logo-placeholder {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #409eff 0%, #7c5cfc 100%);
+      color: #ffffff;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      box-shadow: 0 6px 16px rgba(64, 158, 255, 0.2);
+      flex-shrink: 0;
+    }
+
+    .title-info {
+      min-width: 0;
+
+      .preview-job-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a2332;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .company-name {
+        font-size: 13px;
+        color: #86909c;
+      }
+    }
   }
 
-  /* 呼吸感排版 */
-  .section-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; padding-left: 10px; border-left: 4px solid #409EFF; }
-  .desc-text { font-size: 14px; color: #606266; line-height: 1.8; white-space: pre-wrap; /* 保留换行符 */ }
-  .click-tip { margin-top: auto; text-align: center; color: #409EFF; padding-top: 20px; font-weight: bold; }
+  /* 薪资/城市卡片 */
+  .highlight-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+    border-radius: 14px;
+    border: 1px solid rgba(64, 158, 255, 0.06);
+
+    .h-item {
+      .label {
+        font-size: 11px;
+        color: #a0a4ad;
+        display: block;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+      }
+      .val {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a2332;
+        &.orange { color: #f77c38; }
+      }
+    }
+  }
+
+  /* 标签行 */
+  .preview-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+
+    .preview-tag {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 500;
+
+      &.ptag-0 { background: #e8f4fd; color: #409eff; }
+      &.ptag-1 { background: #f0e8fd; color: #8c97f6; }
+      &.ptag-2 { background: #e8fdf0; color: #52c41a; }
+    }
+  }
+
+  /* 渐变分隔线 */
+  .preview-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, #e8ecf0 20%, #e8ecf0 80%, transparent 100%);
+    margin-bottom: 18px;
+  }
+
+  /* 描述区 */
+  .preview-section {
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a2332;
+      margin-bottom: 12px;
+      padding-left: 10px;
+      border-left: 3px solid;
+      border-image: linear-gradient(180deg, #409eff, #8c97f6) 1;
+    }
+
+    .desc-text {
+      font-size: 13px;
+      color: #4e5969;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+  }
+
+  /* 底部提示 */
+  .click-tip {
+    margin-top: auto;
+    padding-top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #409eff;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+
+    &:hover { opacity: 1; }
+  }
 }
 </style>

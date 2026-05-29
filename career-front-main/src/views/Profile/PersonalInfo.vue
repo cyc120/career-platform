@@ -7,16 +7,16 @@
           <el-icon><User /></el-icon>
           个人信息画像
         </h2>
-        <p class="page-desc">AI 深度分析你的个人能力画像，生成专属诊断报告</p>
+        <p class="page-desc">职能助手深度分析你的个人能力画像，生成专属诊断报告</p>
       </div>
     </div>
 
     <transition name="loading-fade">
       <div v-if="reportStatus !== 'ready'" class="loading-section">
         <InteractiveLoading
-          title="AI 深度诊断中"
+          title="深度诊断中"
           description="正在融合画像数据与诊断模型，生成个性化分析报告"
-          statusText="Career Pilot 诊断引擎运行中"
+          statusText="职能助手诊断引擎运行中"
           :steps="loadingSteps"
           :currentStep="currentLoadingStep"
           :progress="loadingProgress"
@@ -31,7 +31,7 @@
         <div class="hero-copy">
           <div class="eyebrow">
             <el-icon><MagicStick /></el-icon>
-            AI 深度诊断报告
+            深度诊断报告
           </div>
           <h2>{{ userInfo.name || '我的职业画像' }}</h2>
           <div class="profile-line">
@@ -173,7 +173,7 @@ const competitivenessScore = ref(0)
 const aiSuggestions = ref('')
 
 // InteractiveLoading 动画状态
-const loadingSteps = ['加载画像数据', '计算能力模型', '生成词云分析', 'AI 深度诊断']
+const loadingSteps = ['加载画像数据', '计算能力模型', '生成词云分析', '深度诊断']
 const currentLoadingStep = ref(0)
 const loadingProgress = ref(0)
 let loadingTimer = null
@@ -182,7 +182,7 @@ let progressTimer = null
 const startLoadingAnimation = () => {
   currentLoadingStep.value = 0
   loadingProgress.value = 0
-  const stepTexts = ['正在加载画像数据...', '正在计算能力模型...', '正在生成词云分析...', '正在调用 AI 诊断...']
+  const stepTexts = ['正在加载画像数据...', '正在计算能力模型...', '正在生成词云分析...', '正在调用诊断引擎...']
   loadingTimer = setInterval(() => {
     if (currentLoadingStep.value < loadingSteps.length - 1) {
       currentLoadingStep.value++

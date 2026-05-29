@@ -163,7 +163,7 @@
                     </div>
 
                     <p v-else class="empty-preview-tip">
-                      请在左侧对话中完善个人信息，AI 将实时生成能力画像
+                      请在左侧对话中完善个人信息，职能助手将实时生成能力画像
                     </p>
                   </div>
                 </div>
@@ -179,7 +179,7 @@
                 :loading="loading"
               >
                 <el-icon class="el-icon--left"><MagicStick /></el-icon>
-                保存并开始 AI 深度分析
+                保存并开始深度分析
               </el-button>
             </div>
           </div>
@@ -570,7 +570,7 @@ const handleSend = async () => {
     }
   } catch (err) {
     console.error('[Coach] Send failed:', err)
-    aiMsg.content = aiMsg.content || '抱歉，AI 服务暂时不可用，请稍后再试。'
+    aiMsg.content = aiMsg.content || '抱歉，职能助手暂时不可用，请稍后再试。'
   } finally {
     loading.value = false
     isStreaming.value = false
@@ -627,9 +627,9 @@ const completionLabel = computed(() => {
 /* 侧边栏整体重构 */
 .sidebar {
   width: 240px;
-  height: 100vh;
+  height: calc(100vh - 64px);
   position: fixed;
-  top: 0;
+  top: 64px;
   left: 0;
   background: linear-gradient(180deg, rgba(249, 249, 249, 0.445) 0%, rgba(218, 234, 251, 0.586) 50%, rgba(255, 255, 255, 0.3) 100%);
   backdrop-filter: blur(24px) saturate(1.2);
@@ -642,7 +642,7 @@ const completionLabel = computed(() => {
   box-shadow: 4px 0 20px rgba(253, 252, 179, 0.06);
 
   .avatar-placeholder {
-    padding: 40px 0 28px;
+    padding: 20px 0 28px;
     text-align: center;
 
     .el-avatar {
@@ -882,6 +882,7 @@ const completionLabel = computed(() => {
   margin-left: 240px;
   min-width: 0;
   padding: 24px;
+  padding-top: 88px;
   background: transparent;
   overflow-y: auto;
   position: relative;
@@ -889,7 +890,7 @@ const completionLabel = computed(() => {
   &::before {
     content: "";
     position: fixed;
-    top: 0;
+    top: 64px;
     left: 260px;
     right: 0;
     bottom: 0;

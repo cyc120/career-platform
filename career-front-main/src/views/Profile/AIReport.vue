@@ -34,7 +34,7 @@
                   <div class="card glass-card summary-card accent-green">
                     <h3 class="card-title">
                       <el-icon><ChatDotRound /></el-icon>
-                      AI 深度简评
+                      深度简评
                     </h3>
                     <div v-if="aiSummary" class="summary-content markdown-body">
                       {{ aiSummary }}

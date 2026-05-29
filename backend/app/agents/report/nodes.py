@@ -163,6 +163,11 @@ def _format_tasks(tasks: list) -> str:
 async def load_all_data(state: dict) -> dict:
     """从数据库加载所有模块数据。"""
     uid = state["user_id"]
+
+    # 润色模式不需要校验数据
+    if state.get("action") == "polish":
+        return {}
+
     profile, job, match, plan, career, tasks = await asyncio.gather(
         tools.load_user_profile(uid),
         tools.load_selected_job(uid),
@@ -172,13 +177,33 @@ async def load_all_data(state: dict) -> dict:
         tools.load_daily_tasks(uid),
     )
 
-    return {
+    loaded = {
         "user_profile": profile,
         "selected_job": job,
         "match_results": match,
         "learning_plan": plan,
         "career_plan": {**career, "daily_tasks": tasks} if career else {"daily_tasks": tasks},
     }
+
+    # 校验：必须有用户画像且雷达数据有效
+    if not profile:
+        return {**loaded, "error": "NO_PROFILE"}
+
+    radar = profile.get("radar_data", [])
+    if not radar or all(v == 0 for v in radar):
+        return {**loaded, "error": "NO_PROFILE"}
+
+    # 校验：至少还要有匹配结果或职业规划中的一项，否则报告无实质内容
+    has_match = bool(match)
+    has_career = bool(career)
+    if not has_match and not has_career:
+        return {**loaded, "error": "INSUFFICIENT_DATA"}
+
+    print(f"[Report] Data loaded: profile={'Y' if profile else 'N'}, job={'Y' if job else 'N'}, "
+          f"match={'Y' if match else 'N'}, plan={'Y' if plan else 'N'}, "
+          f"career={'Y' if career else 'N'}, tasks={len(tasks) if tasks else 0}")
+
+    return loaded
 
 
 async def generate_report(state: dict) -> dict:

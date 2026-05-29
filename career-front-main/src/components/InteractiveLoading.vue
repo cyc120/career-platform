@@ -73,14 +73,14 @@ import { MagicStick, CircleCheck } from '@element-plus/icons-vue'
 const props = defineProps({
   title: { type: String, default: '加载中...' },
   description: { type: String, default: '' },
-  statusText: { type: String, default: 'AI 引擎运行中' },
+  statusText: { type: String, default: '职能助手运行中' },
   steps: { type: Array, default: () => [] },
   currentStep: { type: Number, default: 0 },
   progress: { type: Number, default: 0 },
   showProgress: { type: Boolean, default: true },
   orbLabels: {
     type: Array,
-    default: () => ['前端', '后端', 'AI', '数据', '产品', '安全', '运维', '设计']
+    default: () => ['前端', '后端', '算法', '数据', '产品', '安全', '运维', '设计']
   }
 })
 
