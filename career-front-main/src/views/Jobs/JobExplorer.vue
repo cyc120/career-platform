@@ -558,56 +558,135 @@ const filterOptions = {
   box-sizing: border-box;
 }
 
-/* --- 1. 顶部搜索区：精致简约 --- */
+/* --- 1. 顶部搜索区：液态玻璃 --- */
 .search-header {
-  margin-bottom: 30px;
+  margin-bottom: 24px;
   flex-shrink: 0;
+  padding: 24px 32px 20px;
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(240,248,255,0.35) 50%, rgba(255,255,255,0.45) 100%);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 4px 20px rgba(80, 152, 249, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.02);
+  position: relative;
+  overflow: hidden;
+
+  /* 顶部流动光晕 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 15%;
+    right: 15%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(80, 152, 249, 0.35), rgba(140, 151, 246, 0.25), transparent);
+    z-index: 1;
+  }
+
+  /* 折射光斑 */
+  &::after {
+    content: '';
+    position: absolute;
+    top: -30%;
+    left: -20%;
+    width: 140%;
+    height: 160%;
+    background: radial-gradient(ellipse at 25% 25%, rgba(80, 152, 249, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 75%, rgba(140, 151, 246, 0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 确保内容在光斑之上 */
+  .search-container,
+  .filter-categories,
+  .tag-container {
+    position: relative;
+    z-index: 1;
+  }
 
   .search-container {
     display: flex;
     justify-content: center;
     gap: 15px;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
+
     .custom-search {
       width: 800px;
       transition: all 0.3s ease;
-  
-  :deep(.el-input__wrapper) {
-    transition: all 0.3s ease;
-    border-radius: 24px;
-  }
 
-  /* 🌟 当搜索框被聚焦时，增加一个宽阔的蓝色光晕 */
-  &.is-focus :deep(.el-input__wrapper),
-  :deep(.el-input__wrapper):hover {
-    box-shadow: 0 0 20px rgba(64, 158, 255, 0.15) !important;
-    border-color: rgba(64, 158, 255, 0.4) !important;
-  }
-}
+      :deep(.el-input__wrapper) {
+        transition: all 0.3s ease;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.65) !important;
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.6) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+      }
+
+      &.is-focus :deep(.el-input__wrapper),
+      :deep(.el-input__wrapper):hover {
+        box-shadow: 0 0 20px rgba(80, 152, 249, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+        border-color: rgba(80, 152, 249, 0.3) !important;
+        background: rgba(255, 255, 255, 0.8) !important;
+      }
+    }
+
     .search-btn {
-  /* 🌟 修改点：使用渐变色，视觉更丝滑 */
-  border-radius: 24px;
-  background: linear-gradient(135deg, #77b1f8 0%, #8c97f6 100%) !important;
-  border: none !important;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3) !important;
-  transition: all 0.3s ease;
+      border-radius: 22px;
+      background: linear-gradient(135deg, rgba(119,177,248,0.85) 0%, rgba(140,151,246,0.85) 100%) !important;
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 4px 12px rgba(64, 158, 255, 0.25) !important;
+      transition: all 0.3s ease;
 
-  &:hover {
-    box-shadow: 0 6px 16px rgba(64, 158, 255, 0.45) !important;
-    transform: translateY(-1px);
+      &:hover {
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.3),
+          0 6px 20px rgba(64, 158, 255, 0.35) !important;
+        transform: translateY(-1px);
+      }
+    }
   }
-}
-  }
+
   .filter-categories {
     display: flex;
     justify-content: center;
     gap: 25px;
     .category-item {
-      cursor: pointer; font-size: 14px; color: #606266; display: flex; align-items: center; gap: 4px;
-      &:hover { color: #409EFF; }
+      cursor: pointer;
+      font-size: 14px;
+      color: #4e5969;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 16px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      transition: all 0.3s ease;
+      &:hover {
+        color: #409EFF;
+        background: rgba(255, 255, 255, 0.55);
+        border-color: rgba(64, 158, 255, 0.15);
+      }
     }
   }
-  .tag-container { display: flex; justify-content: center; gap: 8px; margin-top: 15px; }
+
+  .tag-container {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
 }
 
 /* --- 2. 主体分栏布局：大圆角与呼吸感 --- */
@@ -653,19 +732,50 @@ const filterOptions = {
 
 .elegant-job-card {
   position: relative;
-  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,251,255,0.9) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(240,248,255,0.35) 50%, rgba(255,255,255,0.45) 100%);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border-radius: 20px;
   padding: 0;
   margin-bottom: 14px;
   cursor: pointer;
   overflow: hidden;
-  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  transition: all 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
   box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(64, 158, 255, 0.04) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2),
+    0 4px 20px rgba(80, 152, 249, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.02) !important;
+
+  /* 液态光晕：顶部流动渐变 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(80, 152, 249, 0.4), rgba(140, 151, 246, 0.3), transparent);
+    z-index: 2;
+  }
+
+  /* 液态折射光斑 */
+  &::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(80, 152, 249, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(140, 151, 246, 0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.5s ease;
+    opacity: 0.5;
+  }
 
   /* 左侧渐变装饰条 */
   .card-accent {
@@ -674,25 +784,39 @@ const filterOptions = {
     top: 0;
     bottom: 0;
     width: 4px;
-    background: linear-gradient(180deg, #409eff 0%, #8c97f6 50%, #c084fc 100%);
+    background: linear-gradient(180deg, rgba(80,152,249,0.7) 0%, rgba(140,151,246,0.6) 50%, rgba(192,132,252,0.5) 100%);
     border-radius: 4px 0 0 4px;
-    opacity: 0.6;
-    transition: all 0.35s ease;
+    opacity: 0.5;
+    transition: all 0.4s ease;
+    z-index: 1;
   }
 
-  /* 🌟 悬停效果：浮起 + 发光 + 装饰条高亮 */
+  /* 确保内容在光斑之上 */
+  .card-main, .card-divider, .card-footer {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 悬停效果：液态浮起 + 光晕扩散 */
   &:hover, &.is-active {
-    transform: translateY(-4px) scale(1.005);
+    transform: translateY(-6px) scale(1.008);
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(235,245,255,0.5) 50%, rgba(255,255,255,0.6) 100%);
     box-shadow:
-      0 8px 30px rgba(64, 158, 255, 0.12),
-      0 20px 48px rgba(140, 151, 246, 0.08),
-      0 0 0 1px rgba(64, 158, 255, 0.1) !important;
-    border-color: rgba(64, 158, 255, 0.15) !important;
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      0 12px 40px rgba(80, 152, 249, 0.12),
+      0 4px 16px rgba(140, 151, 246, 0.08),
+      0 0 0 1px rgba(80, 152, 249, 0.08) !important;
+    border-color: rgba(80, 152, 249, 0.2) !important;
+
+    &::after {
+      opacity: 1;
+    }
 
     .card-accent {
       opacity: 1;
       width: 5px;
-      box-shadow: 0 0 12px rgba(64, 158, 255, 0.3);
+      box-shadow: 0 0 16px rgba(80, 152, 249, 0.25);
     }
   }
 
@@ -716,13 +840,14 @@ const filterOptions = {
 
     /* 薪资胶囊 */
     .job-salary-pill {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
-      background: linear-gradient(135deg, #fff4e6 0%, #ffe8cc 100%);
+      background: linear-gradient(135deg, rgba(255,244,230,0.7) 0%, rgba(255,232,204,0.6) 100%);
+      backdrop-filter: blur(8px);
       color: #f77c38;
       padding: 4px 14px;
       border-radius: 20px;
-      border: 1px solid rgba(247, 124, 56, 0.15);
+      border: 1px solid rgba(247, 124, 56, 0.12);
       white-space: nowrap;
     }
   }
@@ -739,7 +864,8 @@ const filterOptions = {
     .comp-logo {
       width: 28px;
       height: 28px;
-      background: linear-gradient(135deg, #e8f0fe 0%, #d4e4ff 100%);
+      background: linear-gradient(135deg, rgba(232,240,254,0.8) 0%, rgba(212,228,255,0.6) 100%);
+      backdrop-filter: blur(8px);
       color: #409eff;
       border-radius: 8px;
       display: flex;
@@ -748,6 +874,7 @@ const filterOptions = {
       font-size: 13px;
       font-weight: 700;
       flex-shrink: 0;
+      border: 1px solid rgba(64,158,255,0.08);
     }
 
     .comp-name {
@@ -776,11 +903,12 @@ const filterOptions = {
     .comp-scale-tag {
       margin-left: auto;
       font-size: 11px;
-      color: #a0a4ad;
-      background: #f7f8fa;
+      color: #86909c;
+      background: rgba(247,248,250,0.6);
+      backdrop-filter: blur(8px);
       padding: 2px 10px;
       border-radius: 10px;
-      border: 1px solid #f0f1f2;
+      border: 1px solid rgba(240,241,242,0.5);
     }
   }
 
@@ -793,14 +921,15 @@ const filterOptions = {
     .premium-tag {
       font-size: 11px;
       padding: 3px 10px;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: 500;
       letter-spacing: 0.3px;
+      backdrop-filter: blur(8px);
 
-      &.tag-variant-0 { background: #e8f4fd; color: #409eff; }
-      &.tag-variant-1 { background: #f0e8fd; color: #8c97f6; }
-      &.tag-variant-2 { background: #e8fdf0; color: #52c41a; }
-      &.tag-variant-3 { background: #fdf6ec; color: #e6a23c; }
+      &.tag-variant-0 { background: rgba(232,244,253,0.7); color: #409eff; border: 1px solid rgba(64,158,255,0.1); }
+      &.tag-variant-1 { background: rgba(240,232,253,0.7); color: #8c97f6; border: 1px solid rgba(140,151,246,0.1); }
+      &.tag-variant-2 { background: rgba(232,253,240,0.7); color: #52c41a; border: 1px solid rgba(82,196,26,0.1); }
+      &.tag-variant-3 { background: rgba(253,246,236,0.7); color: #e6a23c; border: 1px solid rgba(230,162,60,0.1); }
     }
   }
 
@@ -839,12 +968,13 @@ const filterOptions = {
 /* 匹配徽章 */
 .match-badge {
   background: linear-gradient(135deg, rgba(103, 194, 58, 0.08) 0%, rgba(103, 194, 58, 0.04) 100%);
+  backdrop-filter: blur(8px);
   color: #67C23A !important;
   padding: 3px 12px;
   border-radius: 8px;
   font-weight: 600;
   font-size: 11px;
-  border: 1px solid rgba(103, 194, 58, 0.15);
+  border: 1px solid rgba(103, 194, 58, 0.12);
   display: inline-flex;
   align-items: center;
   gap: 5px;

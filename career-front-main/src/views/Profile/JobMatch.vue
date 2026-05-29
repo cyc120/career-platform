@@ -1,8 +1,18 @@
 <template>
   <div class="job-match-container">
+    <!-- 顶部标题栏 -->
+    <div class="action-bar">
+      <h2 class="page-title">
+        <el-icon><Briefcase /></el-icon>
+        人岗匹配
+      </h2>
+      <p class="page-desc">职能助手融合多维数据，为你精准匹配最佳岗位</p>
+    </div>
+
     <div class="job-match-content">
       <!-- 加载状态 -->
-      <div v-if="loading" class="loading-section">
+      <transition name="loading-fade">
+        <div v-if="loading" class="loading-section">
         <InteractiveLoading
           title="匹配分析中"
           description="正在融合多维数据，为你精准匹配最佳岗位"
@@ -14,9 +24,10 @@
           :orbLabels="['前端', '后端', '算法', '数据', '产品', '安全', '运维', '设计']"
         />
       </div>
+      </transition>
 
       <!-- 无数据状态 -->
-      <div v-else-if="!hasData" class="empty-section">
+      <div v-if="!loading && !hasData" class="empty-section">
         <div class="empty-card glass-card">
           <div class="empty-icon">
             <el-icon :size="64"><Briefcase /></el-icon>
@@ -27,7 +38,7 @@
       </div>
 
       <!-- 匹配结果 -->
-      <template v-else>
+      <template v-if="!loading && hasData">
         <!-- 总览区域 -->
         <div class="overview-row">
           <!-- 左侧：最佳匹配雷达图 -->
@@ -659,6 +670,34 @@ watch(currentRadarData, (newVal, oldVal) => {
   }
 }
 
+/* 顶部操作栏 */
+.action-bar {
+  padding: 14px 20px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(240, 248, 255, 0.3));
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  margin-bottom: 16px;
+
+  .page-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    .el-icon { color: #5098f9; font-size: 22px; }
+  }
+  .page-desc {
+    margin: 5px 0 0;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 500;
+  }
+}
+
 /* 加载状态 - 自适应容器大小 */
 .loading-section {
   height: 78vh;
@@ -666,6 +705,11 @@ watch(currentRadarData, (newVal, oldVal) => {
   border-radius: 20px;
   overflow: hidden;
 }
+
+.loading-fade-enter-active,
+.loading-fade-leave-active { transition: opacity 0.5s ease; }
+.loading-fade-enter-from,
+.loading-fade-leave-to { opacity: 0; }
 
 /* 空状态 */
 .empty-section {

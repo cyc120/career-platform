@@ -304,7 +304,7 @@
   <div class="center-text-block center-node" ref="centerNode">
     <div class="small-title">AURORA ENGINE 2.0</div>
     <div class="big-data">基于 <span class="highlight">10,000+</span> 岗位数据</div>
-    <div class="ai-analysis">深度网络分析</div>
+    <div class="ai-analysis">复杂网络分析</div>
   </div>
 
   <div class="post-sphere data-node sphere-1" :ref="setNodeRef"><span class="label">前端开发</span></div>
@@ -2002,7 +2002,7 @@ const handleResize = () => {
 /* 滚动轨道容器 */
 .scroll-row {
   width: 100%;
-  height:210px; /* 固定高度，确保卡片完全显示 */
+  height: auto;
   overflow: hidden;
   background-color: #fafbfc00;
 }
@@ -2025,12 +2025,12 @@ const handleResize = () => {
 
 /* 🌟 第一行动画：向左 */
 .row-left .scroll-track {
-  animation: scrollLeft 12s linear infinite;
+  animation: scrollLeft 30s linear infinite;
 }
 
 /* 🌟 第二行动画：反向（向右） */
 .row-right .scroll-track {
-  animation: scrollLeft 14s linear infinite reverse;
+  animation: scrollLeft 35s linear infinite reverse;
 }
 
 .scroll-row {
@@ -2061,35 +2061,52 @@ const handleResize = () => {
 /* 🌟 核心：针对每个卡片容器的深度美化 */
 :deep(.job-card) {
   /* 基础形状与尺寸 */
-  flex: 0 0 340px; 
-  width: 340px;
-  height: 150px; /* 固定高度保持整齐 */
-  margin: 10px 15px; /* 给阴影留出扩散空间 */
-  
+  flex: 0 0 300px;
+  width: 300px;
+  height: auto;
+  min-height: 150px;
+  margin: 8px 12px;
+
   /* 玻璃拟态质感 */
-  background: rgba(255, 255, 255, 0.65) !important;
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  
-  /* 精致边框：模拟玻璃边缘亮光 */
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  border-radius: 20px !important;
-    /* 弥散投影：极其轻微，防止浅色页面显得脏 */
-  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.04) !important;
-  
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(240, 248, 255, 0.45)) !important;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+
+  /* 精致边框 */
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 4px 20px rgba(80, 152, 249, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.03) !important;
+
   /* 动画过渡 */
   transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1) !important;
   cursor: pointer;
   position: relative;
   overflow: hidden;
 
-  /* 悬停效果：保持滚动的同时增强视觉反馈 */
+  /* 顶部微光装饰 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(80, 152, 249, 0.3), transparent);
+    z-index: 1;
+  }
+
+  /* 悬停效果 */
   &:hover {
-    background: rgba(255, 255, 254, 0.538) !important;
-    transform: translateY(-8px) scale(1.03) !important; /* 向上轻微浮起 */
-    box-shadow: 0 15px 45px rgba(137, 233, 250, 0.15) !important; /* 浅蓝色光晕 */
-    border-color: rgba(70, 168, 171, 0.4) !important;
-    
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(235, 245, 255, 0.6)) !important;
+    transform: translateY(-6px) scale(1.02) !important;
+    box-shadow:
+      0 12px 40px rgba(80, 152, 249, 0.12),
+      0 4px 12px rgba(0, 0, 0, 0.04) !important;
+    border-color: rgba(80, 152, 249, 0.3) !important;
+
     /* 装饰：悬停时左侧出现彩色亮条 */
     &::after {
       content: '';
@@ -2097,14 +2114,15 @@ const handleResize = () => {
       left: 0;
       top: 0;
       height: 100%;
-      width: 5px;
-      background: linear-gradient(to bottom, #b9f2fc, #e599f857);
+      width: 4px;
+      background: linear-gradient(to bottom, #5098f9, #764ba2);
+      border-radius: 4px 0 0 4px;
     }
   }
 
-  /* 内部内容排版美化建议 */
+  /* 内部内容排版 */
   .el-card__body {
-    padding: 20px 24px !important;
+    padding: 16px 20px !important;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -2113,11 +2131,11 @@ const handleResize = () => {
 
   /* 职位名称 */
   .job-name {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
-    color: #2c3e50;
-    margin-bottom: 8px;
-    letter-spacing: 0.5px;
+    color: #1e293b;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
   }
 
   /* 公司与薪资行 */
@@ -2125,20 +2143,20 @@ const handleResize = () => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    
+
     .company-name {
-      font-size: 13px;
-      color: #909399;
+      font-size: 12px;
+      color: #94a3b8;
       display: flex;
       align-items: center;
       gap: 4px;
     }
-    
+
     .salary-tag {
-      font-size: 15px;
-      font-weight: 800;
-      color: #f39c12; /* 高级感的琥珀色 */
-      background: rgba(243, 156, 18, 0.08);
+      font-size: 14px;
+      font-weight: 700;
+      color: #5098f9;
+      background: rgba(80, 152, 249, 0.08);
       padding: 2px 10px;
       border-radius: 8px;
     }
@@ -3001,8 +3019,10 @@ const handleResize = () => {
 
 /* ===== 通用投影补充 ===== */
 :deep(.job-card) {
-  /* 🌟 修改点：投影增强 */
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 4px 20px rgba(80, 152, 249, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.03) !important;
 }
 
 .home-footer {

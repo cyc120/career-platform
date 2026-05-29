@@ -60,14 +60,14 @@ const getMatchColor = (rate) => {
   background: #ffffff;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  padding: 20px;
+  padding: 16px 18px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 180px; /* 固定高度，整齐排列 */
-  transition: all 0.2s ease;
+  height: auto;
+  min-height: 150px;
 
  .job-card.is-active {
   background-color: #ecf5ff;
@@ -77,19 +77,20 @@ const getMatchColor = (rate) => {
 
 .analysis-btn {
   width: 100%;
-  margin-top: 12px;
-  height: 36px;
-  border-radius: 18px !important; /* 胶囊形状 */
+  margin-top: 8px;
+  height: 32px;
+  border-radius: 16px !important;
   border: 1px solid rgba(64, 158, 255, 0.3) !important;
   background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%) !important;
   color: #409eff !important;
   font-weight: 600;
-  letter-spacing: 1px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
 
   .btn-icon {
     font-size: 14px;
@@ -135,13 +136,16 @@ const getMatchColor = (rate) => {
 
 /* 标题样式 */
 .job-title {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 16px;
+  font-weight: 700;
   color: #303133;
-  margin: 0 0 10px 0;
-  white-space: nowrap;
+  margin: 0 0 8px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis; /* 文字过长显示省略号 */
+  text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
 /* 信息行样式 */
@@ -162,18 +166,18 @@ const getMatchColor = (rate) => {
 .match-section {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .match-rate {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1;
 }
 
 .match-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #909399;
 }
 </style>
