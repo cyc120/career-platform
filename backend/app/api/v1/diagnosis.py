@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends
+import asyncio
+import logging
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from langchain_core.messages import HumanMessage, SystemMessage
 from app.agents.llm_factory import get_llm
 from app.middleware.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -66,10 +70,20 @@ async def generate_diagnosis(req: DiagnosisRequest, user: dict = Depends(get_cur
     )
 
     llm = get_llm(temperature=0.7, max_tokens=800)
-    response = await llm.ainvoke([
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=USER_PROMPT),
-    ])
+    try:
+        response = await asyncio.wait_for(
+            llm.ainvoke([
+                SystemMessage(content=SYSTEM_PROMPT),
+                HumanMessage(content=USER_PROMPT),
+            ]),
+            timeout=60,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("[Diagnosis] LLM call timed out (60s)")
+        raise HTTPException(504, "AI诊断生成超时，请稍后重试")
+    except Exception as e:
+        logger.warning(f"[Diagnosis] LLM call failed: {e}")
+        raise HTTPException(502, "AI诊断服务暂时不可用")
 
     # 清理可能的markdown符号残留
     report = response.content

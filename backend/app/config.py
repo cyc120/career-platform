@@ -1,4 +1,30 @@
 from pydantic_settings import BaseSettings
+from pydantic import BaseModel
+
+
+class LLMTemperature(BaseModel):
+    """Centralized LLM temperature presets by task type."""
+    # Extraction / scoring — deterministic, low variance
+    EXTRACT: float = 0.1
+    SCORE: float = 0.0
+    STRUCTURED: float = 0.2
+
+    # Generation — moderate creativity
+    GENERATE_PLAN: float = 0.7
+    GENERATE_REPORT: float = 0.6
+    GENERATE_TASKS: float = 0.5
+    GENERATE_QUESTION: float = 0.3
+
+    # Polish / review — light creativity
+    POLISH: float = 0.5
+    REVIEW: float = 0.3
+
+    # Coaching / diagnosis — conversational
+    COACH: float = 0.7
+    DIAGNOSIS: float = 0.7
+
+    # Trend prediction — creative
+    PREDICT: float = 0.7
 
 
 class Settings(BaseSettings):
@@ -43,6 +69,9 @@ class Settings(BaseSettings):
     AGENT_MAX_RETRIES: int = 3
     AGENT_TIMEOUT_SECONDS: int = 300
     AGENT_ASYNC_WORKERS: int = 4
+
+    # LLM Temperature presets
+    LLM_TEMP: LLMTemperature = LLMTemperature()
 
     # Upload
     UPLOAD_DIR: str = "./uploads"

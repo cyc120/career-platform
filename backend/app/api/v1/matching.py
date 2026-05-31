@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re as _re
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -9,6 +10,8 @@ from app.agents.job_matcher.db_utils import save_selected_job, get_selected_job
 from app.db.mysql import AsyncSessionLocal
 from app.db.neo4j import neo4j_manager
 from app.middleware.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -28,20 +31,35 @@ def _task_done_callback(task: asyncio.Task, label: str):
         return
     exc = task.exception()
     if exc:
-        print(f"[Matching] background task '{label}' failed: {exc}")
+        logger.warning(f"[Matching] background task '{label}' failed: {exc}")
+
+
+async def _run_with_retry(agent_id: str, input_data: dict, user_id: int, max_retries: int = 1):
+    """Run an agent with retry on failure for background tasks."""
+    for attempt in range(max_retries + 1):
+        result = await harness.run(agent_id, input_data, user_id=user_id)
+        if isinstance(result, dict) and result.get("success"):
+            return result
+        error = result.get("error", "unknown") if isinstance(result, dict) else str(result)
+        if attempt < max_retries:
+            logger.info(f"[Matching] retrying {agent_id} (attempt {attempt + 2}): {error}")
+            await asyncio.sleep(2 ** attempt)
+        else:
+            logger.warning(f"[Matching] {agent_id} failed after {max_retries + 1} attempts: {error}")
+    return result
 
 
 async def push_to_planners(user_id: int, top_job: dict):
-    """异步推送匹配结果给 career_planner 和 learning_plan"""
+    """异步推送匹配结果给 career_planner 和 learning_plan（带失败重试）"""
     try:
         job_name = top_job.get("job_title", "") or top_job.get("job_name", "")
         results = await asyncio.gather(
-            harness.run(
+            _run_with_retry(
                 "career_planner",
                 {"user_id": user_id, "top_job": top_job},
                 user_id=user_id,
             ),
-            harness.run(
+            _run_with_retry(
                 "learning_plan",
                 {"user_id": user_id, "action": "generate", "target_job": job_name},
                 user_id=user_id,
@@ -50,25 +68,25 @@ async def push_to_planners(user_id: int, top_job: dict):
         )
         for i, r in enumerate(results):
             if isinstance(r, Exception):
-                print(f"[Matching] push_to_planners subtask {i} error: {r}")
+                logger.warning(f"[Matching] push_to_planners subtask {i} error: {r}")
             elif isinstance(r, dict) and not r.get("success"):
-                print(f"[Matching] push_to_planners subtask {i} failed: {r.get('error')}")
+                logger.warning(f"[Matching] push_to_planners subtask {i} failed: {r.get('error')}")
     except Exception as e:
-        print(f"[Matching] push_to_planners error: {e}")
+        logger.warning(f"[Matching] push_to_planners error: {e}")
 
 
 async def push_career_planner(user_id: int, top_job: dict):
-    """异步推送匹配结果给 career_planner（learning_plan 已在 select-job 中同步完成）"""
+    """异步推送匹配结果给 career_planner（带失败重试）"""
     try:
-        result = await harness.run(
+        result = await _run_with_retry(
             "career_planner",
             {"user_id": user_id, "top_job": top_job},
             user_id=user_id,
         )
         if isinstance(result, dict) and not result.get("success"):
-            print(f"[Matching] push_career_planner failed: {result.get('error')}")
+            logger.warning(f"[Matching] push_career_planner failed: {result.get('error')}")
     except Exception as e:
-        print(f"[Matching] push_career_planner error: {e}")
+        logger.warning(f"[Matching] push_career_planner error: {e}")
 
 
 @router.post("/match")

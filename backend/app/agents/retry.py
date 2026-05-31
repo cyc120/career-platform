@@ -1,11 +1,19 @@
-"""Common retry utility for LLM calls with exponential backoff."""
+"""Common retry utility for LLM calls with exponential backoff.
+
+Also provides SubModuleTracer for wrapping sub-module calls with
+timeout protection, structured logging, and error context.
+"""
 
 import asyncio
-from typing import Any
+import logging
+import time
+from typing import Any, Callable, Optional
 
 from langchain_core.messages import BaseMessage
 
 from app.agents.llm_factory import get_llm
+
+logger = logging.getLogger(__name__)
 
 
 async def llm_call_with_retry(
@@ -60,3 +68,66 @@ def parse_json_response(content: str) -> dict:
             c = c.split(marker)[1].split("```")[0]
             break
     return json.loads(c)
+
+
+class SubModuleTracer:
+    """Wraps sub-module calls with timeout, tracing, and error context.
+
+    Usage:
+        tracer = SubModuleTracer("job_matcher", "job_profiler")
+        result = await tracer.run(extract_job_requirements, job, timeout=60)
+    """
+
+    def __init__(self, parent_agent: str, module_name: str):
+        self.parent_agent = parent_agent
+        self.module_name = module_name
+
+    async def run(
+        self,
+        func: Callable,
+        *args,
+        timeout: int = 60,
+        default: Any = None,
+        **kwargs,
+    ) -> Any:
+        """Execute a sub-module function with timeout and tracing.
+
+        Args:
+            func: Async function to call.
+            *args, **kwargs: Forwarded to func.
+            timeout: Overall timeout in seconds for this call.
+            default: Value to return on failure (None = raise).
+
+        Returns:
+            Function result, or default on failure.
+        """
+        started = time.monotonic()
+        try:
+            result = await asyncio.wait_for(
+                func(*args, **kwargs),
+                timeout=timeout,
+            )
+            elapsed = int((time.monotonic() - started) * 1000)
+            logger.info(
+                f"[{self.parent_agent}:{self.module_name}] "
+                f"completed in {elapsed}ms"
+            )
+            return result
+        except asyncio.TimeoutError:
+            elapsed = int((time.monotonic() - started) * 1000)
+            logger.warning(
+                f"[{self.parent_agent}:{self.module_name}] "
+                f"TIMEOUT after {elapsed}ms (limit={timeout}s)"
+            )
+            if default is not None:
+                return default
+            raise
+        except Exception as e:
+            elapsed = int((time.monotonic() - started) * 1000)
+            logger.warning(
+                f"[{self.parent_agent}:{self.module_name}] "
+                f"FAILED after {elapsed}ms: {e}"
+            )
+            if default is not None:
+                return default
+            raise

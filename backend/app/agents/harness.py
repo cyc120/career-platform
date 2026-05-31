@@ -1,9 +1,13 @@
 import asyncio
 import hashlib
 import json
+import logging
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+
+from sqlalchemy import text
 
 from app.config import settings
 from app.agents.base import AgentBase
@@ -13,10 +17,68 @@ from app.db.redis import (
     cache_agent_result,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def hash_input(data: Dict[str, Any]) -> str:
+    """Compute a cache key from input data.
+
+    Note: This hashes the entire input payload, so agents whose input
+    includes per-user data (e.g. user_profile in job_matcher) will have
+    unique keys per user — effectively disabling cache hits across users.
+    This is intentional: such agents should set cacheable=False in their
+    AgentBase subclass to skip caching entirely.
+    """
     raw = json.dumps(data, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+async def _persist_run(
+    run_id: str,
+    agent_id: str,
+    user_id: int,
+    status: str,
+    input_hash: str,
+    input_data: dict,
+    output_data: dict | None = None,
+    error_message: str | None = None,
+    retry_count: int = 0,
+    duration_ms: int | None = None,
+):
+    """Persist an agent run record to the agent_runs table."""
+    try:
+        from app.db.mysql import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            now = datetime.now(timezone.utc)
+            await db.execute(
+                text("""
+                    INSERT INTO agent_runs
+                        (id, agent_id, user_id, status, input_hash, input_data,
+                         output_data, error_message, retry_count, duration_ms,
+                         started_at, completed_at)
+                    VALUES
+                        (:id, :agent_id, :user_id, :status, :input_hash, :input_data,
+                         :output_data, :error_message, :retry_count, :duration_ms,
+                         :started_at, :completed_at)
+                """),
+                {
+                    "id": run_id,
+                    "agent_id": agent_id,
+                    "user_id": user_id,
+                    "status": status,
+                    "input_hash": input_hash,
+                    "input_data": json.dumps(input_data, ensure_ascii=False, default=str)[:10000],
+                    "output_data": json.dumps(output_data, ensure_ascii=False, default=str)[:50000] if output_data else None,
+                    "error_message": error_message,
+                    "retry_count": retry_count,
+                    "duration_ms": duration_ms,
+                    "started_at": now if status == "running" else None,
+                    "completed_at": now if status in ("success", "failed") else None,
+                },
+            )
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"[Harness] Failed to persist run record {run_id}: {e}")
 
 
 class AgentHarness:
@@ -79,11 +141,18 @@ class AgentHarness:
         input_hash = hash_input(input_data)
         run_id = str(uuid.uuid4())
 
+        # Persist "running" status
+        await _persist_run(run_id, agent_id, user_id, "running", input_hash, input_data)
+
         # Check cache (skip if Redis unavailable)
         if agent.cacheable and not force_refresh:
             try:
                 cached = await get_cached_agent_result(agent_id, input_hash)
                 if cached:
+                    await _persist_run(
+                        run_id, agent_id, user_id, "success", input_hash,
+                        input_data, output_data=json.loads(cached), duration_ms=0,
+                    )
                     return {
                         "success": True,
                         "data": json.loads(cached),
@@ -115,6 +184,13 @@ class AgentHarness:
                     except Exception:
                         pass  # Redis unavailable — skip caching
 
+                # Persist success
+                await _persist_run(
+                    run_id, agent_id, user_id, "success", input_hash,
+                    input_data, output_data=result,
+                    retry_count=attempt, duration_ms=duration_ms,
+                )
+
                 return {
                     "success": True,
                     "data": result,
@@ -131,6 +207,13 @@ class AgentHarness:
             # Exponential backoff: 1s, 2s, 4s
             if attempt < agent.max_retries:
                 await asyncio.sleep(min(2 ** attempt, 8))
+
+        # Persist failure
+        await _persist_run(
+            run_id, agent_id, user_id, "failed", input_hash,
+            input_data, error_message=last_error,
+            retry_count=agent.max_retries,
+        )
 
         return {
             "success": False,

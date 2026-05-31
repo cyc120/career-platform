@@ -1,5 +1,6 @@
 """报告智能体图节点。"""
 
+import logging
 import re
 import json
 import asyncio
@@ -9,6 +10,8 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.agents.llm_factory import get_llm
 from app.agents.report import tools
 from app.agents.report import prompts
+
+logger = logging.getLogger(__name__)
 
 DIM_NAMES = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
 
@@ -161,21 +164,44 @@ def _format_tasks(tasks: list) -> str:
 
 
 async def load_all_data(state: dict) -> dict:
-    """从数据库加载所有模块数据。"""
+    """从数据库加载所有模块数据，部分失败时降级生成。"""
     uid = state["user_id"]
 
     # 润色模式不需要校验数据
     if state.get("action") == "polish":
         return {}
 
-    profile, job, match, plan, career, tasks = await asyncio.gather(
+    # return_exceptions=True: 任何一路失败不中断其他路
+    results = await asyncio.gather(
         tools.load_user_profile(uid),
         tools.load_selected_job(uid),
         tools.load_match_report(uid),
         tools.load_learning_plan(uid),
         tools.load_career_plan(uid),
         tools.load_daily_tasks(uid),
+        return_exceptions=True,
     )
+
+    labels = ["profile", "job", "match", "plan", "career", "tasks"]
+    profile = job = match = plan = career = None
+    tasks = []
+
+    for label, result in zip(labels, results):
+        if isinstance(result, Exception):
+            logger.warning(f"[Report] load_{label} failed: {result}")
+            continue
+        if label == "profile":
+            profile = result
+        elif label == "job":
+            job = result
+        elif label == "match":
+            match = result
+        elif label == "plan":
+            plan = result
+        elif label == "career":
+            career = result
+        elif label == "tasks":
+            tasks = result or []
 
     loaded = {
         "user_profile": profile,
@@ -199,9 +225,16 @@ async def load_all_data(state: dict) -> dict:
     if not has_match and not has_career:
         return {**loaded, "error": "INSUFFICIENT_DATA"}
 
-    print(f"[Report] Data loaded: profile={'Y' if profile else 'N'}, job={'Y' if job else 'N'}, "
-          f"match={'Y' if match else 'N'}, plan={'Y' if plan else 'N'}, "
-          f"career={'Y' if career else 'N'}, tasks={len(tasks) if tasks else 0}")
+    # 记录哪些数据缺失（降级生成）
+    missing = [l for l, r in zip(labels, results) if isinstance(r, Exception)]
+    if missing:
+        logger.info(f"[Report] Degraded mode — missing data: {missing}")
+
+    logger.info(
+        f"[Report] Data loaded: profile={'Y' if profile else 'N'}, job={'Y' if job else 'N'}, "
+        f"match={'Y' if match else 'N'}, plan={'Y' if plan else 'N'}, "
+        f"career={'Y' if career else 'N'}, tasks={len(tasks) if tasks else 0}"
+    )
 
     return loaded
 

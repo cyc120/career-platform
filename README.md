@@ -42,7 +42,7 @@
 │  │ Agent  │ Agent  │ Agent  │ Agent  │ Agent  │                     │
 │  └────────┴────────┴────────┴────────┴────────┘                     │
 │                                                                      │
-│  共享基础设施: LLM工厂 · 重试工具 · RAG检索 · 数据库 · Redis        │
+│  共享基础设施: LLM工厂 · 重试工具 · SubModuleTracer · RAG检索 · 数据库 · Redis │
 └──────────────────────────────────────────────────────────────────────┘
          │              │              │
          ▼              ▼              ▼
@@ -60,14 +60,15 @@
 | 学习计划 | `learning_plan` | 8 | 1 次/action | 300s | 是 |
 | 报告生成 | `report` | 4 | 1 次 | 180s | 否 |
 
-### 直接 LLM 端点（不经过 Harness）
+### 直接 LLM 端点（不经过 Harness，已统一超时保护）
 
-| 端点 | 说明 |
-|------|------|
-| `POST /diagnosis/generate` | AI 深度诊断（雷达图 → 文字报告） |
-| `POST /coach/chat` | 职业教练对话 |
-| `POST /generate/resume` | AI 简历生成 |
-| `GET /learning/daily-tasks` | 每日学习任务 |
+| 端点 | 说明 | 超时 |
+|------|------|------|
+| `POST /diagnosis/generate` | AI 深度诊断（雷达图 → 文字报告） | 60s |
+| `POST /learning-plan/coach` | 职业教练对话 | 30s |
+| `POST /learning-plan/coach/stream` | 职业教练对话（SSE 流式） | 30s |
+| `POST /learning-plan/daily-tasks` | 每日学习任务 | 60s |
+| `POST /learning-plan/generate` | 学习计划生成 | 60s |
 
 ### 数据流
 
@@ -304,7 +305,7 @@ career-platform/
 │   │   │   ├── harness.py            #   AgentHarness 调度器
 │   │   │   ├── registry.py           #   智能体注册
 │   │   │   ├── llm_factory.py        #   LLM 实例工厂
-│   │   │   ├── retry.py              #   重试工具
+│   │   │   ├── retry.py              #   重试工具 + SubModuleTracer
 │   │   │   ├── resume_analyzer/      #   简历分析智能体
 │   │   │   ├── job_matcher/          #   岗位匹配智能体
 │   │   │   ├── career_planner/       #   职业规划智能体
@@ -393,10 +394,11 @@ result = await harness.run(agent_id, input_data, user_id)  # 执行
 ```
 
 内置能力：
-- **SHA-256 缓存**：相同输入直接返回缓存结果
+- **SHA-256 缓存**：相同输入直接返回缓存结果（`cacheable=False` 的智能体跳过缓存）
 - **指数退避重试**：1s → 2s → 4s，最多 3 次
 - **超时控制**：每个智能体独立超时配置
-- **运行追踪**：记录每次执行状态和耗时
+- **运行追踪**：每次执行自动写入 `agent_runs` 表（状态、耗时、重试次数、输入输出）
+- **子模块追踪**：`SubModuleTracer` 为子模块（job_profiler / profile_analyzer / task_planner）提供超时保护和结构化日志
 
 ### RAG 检索增强
 
@@ -408,12 +410,13 @@ result = await harness.run(agent_id, input_data, user_id)  # 执行
 
 ### 降级策略
 
-| 组件 | 降级方案 |
-|------|----------|
-| Redis | 内存字典（`memory_store.py`） |
-| Neo4j | 跳过图谱增强，直接进入下一步 |
-| LLM 失败 | 返回本地算法兜底结果 |
-| 证书评分 | 纯算法，不依赖 LLM |
+| 组件 | 降级方案 | 日志/影响 |
+|------|----------|-----------|
+| Redis | 内存字典（`memory_store.py`） | 无持久化，重启丢失 |
+| Neo4j | 跳过图谱增强，匹配降级为纯 RAG+算法评分 | 首次失败输出 WARNING，记录影响范围 |
+| LLM 失败 | 返回本地算法兜底结果 | agent_runs 表记录失败详情 |
+| 证书评分 | 纯算法，不依赖 LLM | 无 |
+| 报告数据加载 | `return_exceptions=True`，部分数据缺失时降级生成 | 日志记录缺失的数据源 |
 
 ---
 

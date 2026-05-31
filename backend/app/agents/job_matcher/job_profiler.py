@@ -49,14 +49,14 @@ MAX_CACHE_SIZE = 200
 
 
 def _cache_key(job: dict) -> str:
-    """Generate cache key from job info."""
+    """Generate cache key from job info using SHA-256 (collision-resistant)."""
     key_parts = [
         str(job.get("id", "")),
         job.get("job_title", ""),
         job.get("company", ""),
     ]
     raw = "|".join(key_parts)
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _parse_json(content: str) -> dict:

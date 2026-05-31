@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,8 +11,11 @@ from app.agents.learning_plan import tools
 from app.agents.learning_plan.profile_analyzer import analyze_profile
 from app.agents.learning_plan.task_planner import generate_daily_tasks as planner_generate
 from app.agents.llm_factory import get_llm
+from app.agents.retry import SubModuleTracer
 from app.agents.job_matcher.db_utils import save_user_profile, get_user_profile
 from app.middleware.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 
 DIM_ORDER = ["专业技能", "创新能力", "学习能力", "实习能力", "抗压能力", "沟通能力", "证书"]
@@ -202,15 +207,26 @@ async def generate_plan(req: GenerateRequest, user: dict = Depends(get_current_u
     # 加载用户画像，生成个性化学习计划
     current_skills = await _build_current_skills(uid)
 
-    # 直接调 LLM 生成
+    # 直接调 LLM 生成（带超时保护）
     llm = get_llm(temperature=0.7)
-    msg = await llm.ainvoke([
-        SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
-        HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
-            current_skills=current_skills, target_job=target_job,
-            resources="[]", plan_type=req.plan_type,
-        )),
-    ])
+    try:
+        msg = await asyncio.wait_for(llm.ainvoke([
+            SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
+            HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
+                current_skills=current_skills, target_job=target_job,
+                resources="[]", plan_type=req.plan_type,
+            )),
+        ]), timeout=60)
+    except asyncio.TimeoutError:
+        logger.warning(f"[API] generate plan LLM timed out for '{target_job}'")
+        if existing and existing.get("phases"):
+            return {"success": True, "learning_plan": {"target_job": existing_job, "plan_type": "长期", "phases": existing["phases"]}}
+        raise HTTPException(504, "学习计划生成超时，请稍后重试")
+    except Exception as e:
+        logger.warning(f"[API] generate plan LLM error: {e}")
+        if existing and existing.get("phases"):
+            return {"success": True, "learning_plan": {"target_job": existing_job, "plan_type": "长期", "phases": existing["phases"]}}
+        raise HTTPException(502, "学习计划生成服务暂时不可用")
     try:
         raw = msg.content.strip()
         for marker in ("```json", "```"):
@@ -279,16 +295,23 @@ async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_
 
     # 3. 计划不存在或目标岗位不匹配 → 直接调 LLM 生成计划
     if not plan or not plan.get("phases") or (target_job and plan_job != target_job):
-        print(f"[API] daily-tasks: generating plan for '{target_job}' via LLM...")
+        logger.info(f"[API] daily-tasks: generating plan for '{target_job}' via LLM...")
         current_skills = await _build_current_skills(uid)
         llm = get_llm(temperature=0.7)
-        msg = await llm.ainvoke([
-            SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
-            HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
-                current_skills=current_skills, target_job=target_job,
-                resources="[]", plan_type="长期",
-            )),
-        ])
+        try:
+            msg = await asyncio.wait_for(llm.ainvoke([
+                SystemMessage(content=lp_prompts.PLAN_GENERATION_SYSTEM + "\n输出纯JSON。"),
+                HumanMessage(content=lp_prompts.PLAN_GENERATION_USER.format(
+                    current_skills=current_skills, target_job=target_job,
+                    resources="[]", plan_type="长期",
+                )),
+            ]), timeout=60)
+        except asyncio.TimeoutError:
+            logger.warning(f"[API] daily-tasks: plan LLM timed out for '{target_job}'")
+            return {"success": False, "daily_tasks": [], "target_job": target_job, "error": "学习计划生成超时，请稍后重试"}
+        except Exception as e:
+            logger.warning(f"[API] daily-tasks: plan LLM error: {e}")
+            return {"success": False, "daily_tasks": [], "target_job": target_job, "error": "学习计划生成失败"}
         try:
             raw = msg.content.strip()
             for marker in ("```json", "```"):
@@ -328,9 +351,15 @@ async def generate_daily_tasks(req: DailyTasksRequest, user: dict = Depends(get_
         except Exception:
             user_profile = None
 
-    # 6. 多步流水线生成任务
+    # 6. 多步流水线生成任务（sub-module with tracing）
     phase = phases[req.phase_index] if req.phase_index < len(phases) else phases[0]
-    tasks = await planner_generate(phase, target_job, user_profile=user_profile)
+    task_tracer = SubModuleTracer("daily_tasks", "task_planner")
+    tasks = await task_tracer.run(
+        planner_generate, phase, target_job,
+        user_profile=user_profile,
+        timeout=120,
+        default=[],
+    )
 
     if tasks:
         await tools.save_daily_tasks(uid, tasks, target_job)
@@ -403,7 +432,14 @@ async def career_coach(req: CoachRequest, user: dict = Depends(get_current_user)
 
     messages.append(HumanMessage(content=req.message))
 
-    response = await llm.ainvoke(messages)
+    try:
+        response = await asyncio.wait_for(llm.ainvoke(messages), timeout=30)
+    except asyncio.TimeoutError:
+        logger.warning("[Coach] LLM call timed out (30s)")
+        raise HTTPException(504, "AI教练响应超时，请稍后重试")
+    except Exception as e:
+        logger.warning(f"[Coach] LLM call failed: {e}")
+        raise HTTPException(502, "AI教练服务暂时不可用")
     reply = response.content
 
     # Build full chat history including the new reply for profile analysis
@@ -412,14 +448,18 @@ async def career_coach(req: CoachRequest, user: dict = Depends(get_current_user)
         {"role": "assistant", "content": reply},
     ]
 
-    # Run profile analyzer (sub-module)
+    # Run profile analyzer (sub-module) with tracing and timeout
+    tracer = SubModuleTracer("coach", "profile_analyzer")
     radar_data = [0, 0, 0, 0, 0, 0, 0]
     dimension_details = {}
     try:
-        result = await analyze_profile(
+        result = await tracer.run(
+            analyze_profile,
             chat_history=full_history,
             previous_radar_data=req.previous_radar_data,
             previous_details=req.previous_details or {},
+            timeout=60,
+            default={"radar_data": radar_data, "dimension_details": dimension_details},
         )
         radar_data = result.get("radar_data", radar_data)
         dimension_details = result.get("dimension_details", dimension_details)
@@ -493,20 +533,22 @@ async def coach_stream(req: CoachRequest, user: dict = Depends(get_current_user)
             {"role": "user", "content": req.message},
             {"role": "assistant", "content": full_reply},
         ]
+        tracer = SubModuleTracer("coach_stream", "profile_analyzer")
         radar_data = [0, 0, 0, 0, 0, 0, 0]
         dimension_details = {}
         try:
-            result = await analyze_profile(
+            result = await tracer.run(
+                analyze_profile,
                 chat_history=full_history,
                 previous_radar_data=req.previous_radar_data,
                 previous_details=req.previous_details or {},
+                timeout=60,
+                default={"radar_data": radar_data, "dimension_details": dimension_details},
             )
             radar_data = result.get("radar_data", radar_data)
             dimension_details = result.get("dimension_details", dimension_details)
         except Exception as e:
-            import traceback
-            print(f"[Coach] Profile analyzer error: {e}")
-            traceback.print_exc()
+            logger.warning(f"[Coach] Profile analyzer error: {e}")
 
         # 持久化画像到 user_profiles 表，供 job_matcher 等智能体使用
         if any(v > 0 for v in radar_data):

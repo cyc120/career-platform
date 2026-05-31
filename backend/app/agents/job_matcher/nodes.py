@@ -1,14 +1,18 @@
 """LangGraph nodes for the Job Matcher agent."""
 
 import json
+import logging
 from typing import Dict
 
 from app.agents.job_matcher.state import JobMatcherState
 from app.agents.job_matcher import db_utils
 from app.agents.job_matcher.scorer import MatchScorer
 from app.agents.job_matcher.job_profiler import extract_job_requirements
+from app.agents.retry import SubModuleTracer
 from app.rag.retrievers import resume_job_matcher
 from app.db.neo4j import neo4j_manager
+
+logger = logging.getLogger(__name__)
 
 
 async def load_user_profile(state: JobMatcherState) -> Dict:
@@ -100,13 +104,18 @@ async def load_job_details(state: JobMatcherState) -> Dict:
 
 
 async def neo4j_enrich(state: JobMatcherState) -> Dict:
-    """Enrich job matching with Neo4j graph profiles."""
+    """Enrich job matching with Neo4j graph profiles.
+
+    Gracefully degrades when Neo4j is unavailable — matching proceeds
+    with RAG + algorithmic scoring only, without graph-based enrichment.
+    """
     jobs = state.get("job_details", [])
     profiles = []
 
     try:
         session = await neo4j_manager.get_session()
         if session is None:
+            logger.info("[Match] Neo4j unavailable — skipping graph enrichment, using RAG+scoring only")
             return {"neo4j_profiles": []}
         for job in jobs:
             result = await session.run(
@@ -117,8 +126,9 @@ async def neo4j_enrich(state: JobMatcherState) -> Dict:
             if record:
                 profiles.append(dict(record["jp"]))
         await session.close()
-    except Exception:
-        pass
+        logger.info(f"[Match] Neo4j enriched {len(profiles)}/{len(jobs)} jobs with graph profiles")
+    except Exception as e:
+        logger.warning(f"[Match] Neo4j enrichment failed — continuing without graph data: {e}")
 
     return {"neo4j_profiles": profiles}
 
@@ -133,18 +143,19 @@ async def algorithmic_match(state: JobMatcherState) -> Dict:
 
     profile = state.get("user_profile", {})
     jobs = state.get("job_details", [])
-    print(f"[Match] algorithmic_match: scoring {len(jobs)} jobs: {[j.get('job_title','?') for j in jobs]}")
+    logger.info(f"[Match] algorithmic_match: scoring {len(jobs)} jobs: {[j.get('job_title','?') for j in jobs]}")
 
     if not jobs:
         return {"match_results": []}
 
-    # Step 1: Get job requirements for each job (sub-agent: job_profiler)
+    # Step 1: Get job requirements for each job (sub-module: job_profiler)
+    profiler_tracer = SubModuleTracer("job_matcher", "job_profiler")
+
     async def get_job_requirements(job: dict) -> dict:
-        try:
-            return await extract_job_requirements(job)
-        except Exception as e:
-            print(f"[Match] job_profiler error: {e}")
-        return {}
+        return await profiler_tracer.run(
+            extract_job_requirements, job,
+            timeout=60, default={},
+        )
 
     # Run all job_profiler calls concurrently
     req_tasks = [get_job_requirements(job) for job in jobs]
