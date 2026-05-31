@@ -390,16 +390,6 @@
     </footer>
     </div>
 
-    <!-- 悬浮球：提醒完善个人信息 -->
-    <div v-if="!isProfileCompleted" class="floating-profile-ball" @click="router.push('/profile')">
-      <button class="ball-close" @click.stop="dismissGuide">&times;</button>
-      <div class="ball-icon">
-        <el-icon :size="24"><UserFilled /></el-icon>
-      </div>
-      <span class="ball-text">完善信息</span>
-      <span class="ball-badge">!</span>
-    </div>
-
   </div>
 </template>
 
@@ -426,7 +416,6 @@ import { currentRadarData } from '@/views/Profile/profileState'
 import { useAuthStore } from '@/stores/auth'
 import JobCard from '@/components/JobCard.vue'
 import gsap from 'gsap'
-import { UserFilled } from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
 const hotJobs = ref([])
@@ -475,7 +464,6 @@ const userDataFallback = {
   },
 }
 
-const isProfileCompleted = ref(!!sessionStorage.getItem('is_profile_completed'))
 const hasProfile = ref(false)
 const profileLoading = ref(true)
 
@@ -485,16 +473,12 @@ const checkProfileStatus = async () => {
     const hasRadar = currentRadarData.value && currentRadarData.value.some(v => v > 0)
     if (hasRadar) {
       hasProfile.value = true
-      isProfileCompleted.value = true
-      sessionStorage.setItem('is_profile_completed', 'true')
       return
     }
     // 2. 从个人中心保存后跳转过来（一次性标记，读后即删）
     if (sessionStorage.getItem('profile_saved') === 'true') {
       sessionStorage.removeItem('profile_saved')
       hasProfile.value = true
-      isProfileCompleted.value = true
-      sessionStorage.setItem('is_profile_completed', 'true')
       return
     }
     // 3. 未填写 → 显示空态
@@ -506,10 +490,6 @@ const checkProfileStatus = async () => {
   }
 }
 
-const dismissGuide = () => {
-  isProfileCompleted.value = true
-  sessionStorage.setItem('is_profile_completed', 'true')
-}
 // 计算胜率：个人分 / 岗位要求分 (假设 category 里有要求分)
 const calculateWinRate = (category) => {
   const baseRate = 70; // 基础分
@@ -1060,95 +1040,6 @@ const handleResize = () => {
   text-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
   
   line-height: 1.3;
-}
-
-/* 悬浮球：提醒完善个人信息 */
-.floating-profile-ball {
-  position: fixed;
-  bottom: 40px;
-  right: 40px;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 20px 14px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 50px;
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: ballPulse 2s ease-in-out infinite;
-
-  &:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.5);
-    animation: none;
-  }
-
-  .ball-close {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.3);
-    border: 2px solid #fff;
-    color: #fff;
-    font-size: 12px;
-    line-height: 16px;
-    text-align: center;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  .ball-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .ball-text {
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-  }
-
-  .ball-badge {
-    position: absolute;
-    top: -4px;
-    left: -4px;
-    width: 20px;
-    height: 20px;
-    background: #ff4757;
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #fff;
-    animation: badgeBounce 1.5s ease-in-out infinite;
-  }
-}
-
-@keyframes ballPulse {
-  0%, 100% { box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4); }
-  50% { box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4), 0 0 0 8px rgba(102, 126, 234, 0.15); }
-}
-
-@keyframes badgeBounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
 }
 
 // ========== 1. 顶部区域 (修正了布局与层级) ==========
