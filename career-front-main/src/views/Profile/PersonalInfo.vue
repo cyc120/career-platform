@@ -133,7 +133,7 @@
           <span><el-icon><MagicStick /></el-icon>诊断结论</span>
         </div>
         <div v-if="analysisReport" class="report-content-grid">
-          <p v-for="(paragraph, idx) in reportParagraphs" :key="idx">{{ paragraph }}</p>
+          <p v-for="(paragraph, idx) in reportParagraphs" :key="idx" v-html="highlightReport(paragraph)"></p>
         </div>
         <el-skeleton v-else :rows="4" animated />
       </section>
@@ -284,10 +284,30 @@ const weakestDimension = computed(() => scoredDimensions.value.slice().sort((a, 
 const reportParagraphs = computed(() => {
   if (!analysisReport.value) return []
   return analysisReport.value
-    .split(/(?<=[。！？!?])\s*/)
-    .map(item => item.trim())
+    .split(/\n{2,}/)
+    .map(item => item.trim().replace(/\n/g, ''))
     .filter(Boolean)
 })
+
+const highlightReport = (text) => {
+  if (!text) return ''
+  // 维度名称
+  const dims = ['专业技能', '创新能力', '学习能力', '实习能力', '抗压能力', '沟通能力', '证书']
+  // 关键结论词
+  const keywords = ['优势', '不足', '短板', '欠缺', '突出', '较强', '较弱', '薄弱', '建议', '提升', '加强', '巩固', '优秀', '良好', '中等', '待提升', '待补充', '竞争力', '核心竞争力', '综合评价', '整体水平', '发展前景']
+  let result = text
+  // 加粗维度名称
+  for (const dim of dims) {
+    result = result.replaceAll(dim, `<strong>${dim}</strong>`)
+  }
+  // 加粗关键结论词（仅匹配词本身，不包含前后文字）
+  for (const kw of keywords) {
+    result = result.replaceAll(kw, `<strong>${kw}</strong>`)
+  }
+  // 加粗分数（如 85分、70分）
+  result = result.replace(/(\d{2,3})分/g, `<strong>$1分</strong>`)
+  return result
+}
 
 const selectDimension = (idx) => {
   selectedDimensionIndex.value = idx
@@ -712,6 +732,7 @@ const initWordCloud = () => {
 
   .hero-copy {
     min-width: 0;
+    margin-left: 40px;
   }
 
   .eyebrow {
@@ -785,9 +806,10 @@ const initWordCloud = () => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  margin-left: -200px;
 
   .score-ring {
-    width: clamp(132px, 13vw, 158px);
+    width: clamp(160px, 16vw, 190px);
     aspect-ratio: 1;
     border-radius: 50%;
     display: grid;
@@ -804,7 +826,7 @@ const initWordCloud = () => {
   }
 
   .score-number {
-    font-size: clamp(34px, 3.6vw, 42px);
+    font-size: clamp(40px, 4.2vw, 50px);
     font-weight: 900;
     line-height: 1;
     color: #0f172a;
@@ -1124,6 +1146,11 @@ const initWordCloud = () => {
     font-size: 14px;
     line-height: 1.85;
     text-align: justify;
+
+    :deep(strong) {
+      color: #1e3a5f;
+      font-weight: 700;
+    }
   }
 }
 

@@ -9,6 +9,9 @@
         </h2>
         <p class="page-desc">AI 驱动的个性化学习计划，助你稳步成长</p>
       </div>
+      <div class="action-right" v-if="targetPosition">
+        <span class="target-job-name">{{ targetPosition }}</span>
+      </div>
     </div>
 
     <!-- 加载状态 - 与人岗匹配一致 -->
@@ -26,32 +29,6 @@
     </div>
 
     <template v-else>
-    <div class="agent-command-bar glass-card">
-      <div class="agent-info">
-        <div class="agent-avatar">
-          <el-icon class="pulse-icon"><MagicStick /></el-icon>
-        </div>
-        <div class="agent-message">
-          <div class="agent-header-row">
-            <span class="agent-name">职能助手</span>
-            <el-tag v-if="targetPosition" size="small" effect="plain" type="primary">{{ targetPosition }}</el-tag>
-          </div>
-          <p class="message-text">{{ aiAnalysis }}</p>
-        </div>
-      </div>
-      <div class="quick-stats" v-if="growthRate !== '--' || pathSteps.length > 0">
-        <div class="stat-item">
-          <span class="label">成长速度</span>
-          <span class="value">{{ growthRate }}</span>
-        </div>
-        <el-divider direction="vertical" />
-        <div class="stat-item">
-          <span class="label">学习阶段</span>
-          <span class="value">{{ pathSteps.length }}阶段</span>
-        </div>
-      </div>
-    </div>
-
     <el-row :gutter="20" class="main-tracking-row equal-height">
       <el-col :xs="24" :md="14" :lg="15">
         <el-card class="glass-card chart-card">
@@ -1312,6 +1289,9 @@ watch(isCoachingOpen, (open) => {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 
   .page-title {
     margin: 0;
@@ -1332,6 +1312,12 @@ watch(isCoachingOpen, (open) => {
     font-weight: 500;
     line-height: 1.5;
     word-break: break-word;
+  }
+  .target-job-name {
+    font-size: 30px;
+    font-weight: 700;
+    color: #132d57;
+    margin-right: 50px;
   }
 }
 </style>

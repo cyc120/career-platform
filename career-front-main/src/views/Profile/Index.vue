@@ -1245,12 +1245,18 @@ const completionLabel = computed(() => {
 
 .sub-page {
   animation: fadeIn 0.4s ease-out;
+  margin-top: -64px;
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.content-wrapper {
+  padding-top: 0;
+}
 
 .dashboard-result-view {
   animation: slideUp 0.6s ease-out;
   padding: 20px;
+  margin-top: -64px;
   background: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(16px) saturate(1.1);
   -webkit-backdrop-filter: blur(16px) saturate(1.1);

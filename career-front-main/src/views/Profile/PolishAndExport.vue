@@ -55,7 +55,7 @@
           </div>
 
           <div class="quick-tags">
-            <el-tag v-for="tag in ['更专业', '更精简', '突出技术', '增加细节', '调整语气']"
+            <el-tag v-for="tag in ['更专业', '更精简', '突出技术', '增加细节']"
                     :key="tag" @click="polishNote = tag" class="tag-item">
               {{ tag }}
             </el-tag>

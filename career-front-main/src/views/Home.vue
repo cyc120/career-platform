@@ -2006,7 +2006,7 @@ const handleResize = () => {
       top: 0;
       height: 100%;
       width: 4px;
-      background: linear-gradient(to bottom, #5098f9, #764ba2);
+      background: linear-gradient(to bottom, #a6ccfe, #f7d6f7);
       border-radius: 4px 0 0 4px;
     }
   }

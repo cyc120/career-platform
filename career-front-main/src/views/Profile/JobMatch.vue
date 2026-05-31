@@ -967,10 +967,10 @@ watch(currentRadarData, (newVal, oldVal) => {
 
   .dim-decoration {
     position: absolute;
-    bottom: -50px;
+    bottom: -150px;
     right: -50px;
     width: 800px;
-    height: 300px;
+    height: 500px;
     opacity: 0.12;
     pointer-events: none;
     z-index: 0;

@@ -522,11 +522,16 @@ async def coach_stream(req: CoachRequest, user: dict = Depends(get_current_user)
         full_reply = ""
 
         # Stream LLM tokens
-        async for chunk in llm.astream(messages):
-            token = chunk.content
-            if token:
-                full_reply += token
-                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+        try:
+            async for chunk in llm.astream(messages):
+                token = chunk.content
+                if token:
+                    full_reply += token
+                    yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.error(f"[Coach] LLM stream error: {type(e).__name__}: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)[:200]}, ensure_ascii=False)}\n\n"
+            return
 
         # Run profile analyzer (sub-module) after stream completes
         full_history = list(req.history) + [
