@@ -43,7 +43,7 @@ async def list_jobs(
     if city:
         query += " AND city LIKE :ct"
         params["ct"] = f"%{city}%"
-    query += " ORDER BY publish_date DESC LIMIT :lim OFFSET :off"
+    query += " ORDER BY id DESC LIMIT :lim OFFSET :off"
     params["lim"] = page_size
     params["off"] = offset
 

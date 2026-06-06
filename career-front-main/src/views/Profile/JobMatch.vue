@@ -39,6 +39,38 @@
 
       <!-- 匹配结果 -->
       <template v-if="!loading && hasData">
+        <!-- 匹配概览 Hero 区 -->
+        <div class="hero-stats">
+          <div class="stat-card">
+            <div class="stat-icon"><el-icon><List /></el-icon></div>
+            <div class="stat-body">
+              <span class="stat-num">{{ rankedResults.length }}</span>
+              <span class="stat-label">匹配岗位</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon icon-score"><el-icon><DataAnalysis /></el-icon></div>
+            <div class="stat-body">
+              <span class="stat-num">{{ selectedJob.total_score || '--' }}</span>
+              <span class="stat-label">最高评分</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon icon-industry"><el-icon><OfficeBuilding /></el-icon></div>
+            <div class="stat-body">
+              <span class="stat-num text-sm">{{ selectedJob.industry || '--' }}</span>
+              <span class="stat-label">目标行业</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon icon-level"><el-icon><Aim /></el-icon></div>
+            <div class="stat-body">
+              <span class="stat-num text-sm">{{ getScoreLevel(selectedJob.total_score || 0) }}</span>
+              <span class="stat-label">匹配等级</span>
+            </div>
+          </div>
+        </div>
+
         <!-- 总览区域 -->
         <div class="overview-row">
           <!-- 左侧：最佳匹配雷达图 -->
@@ -73,6 +105,7 @@
                 v-for="(job, idx) in rankedResults"
                 :key="idx"
                 :class="['job-item', { selected: selectedIndex === idx }]"
+                :style="{ animationDelay: `${idx * 0.06}s` }"
                 @click="selectJob(idx)"
               >
                 <div class="rank-badge" :class="getRankClass(idx)">{{ idx + 1 }}</div>
@@ -80,6 +113,9 @@
                   <div class="job-title-row">
                     <span class="job-title">{{ job.job_title }}</span>
                     <span class="job-company">{{ job.company }}</span>
+                    <span :class="['match-level-tag', getScoreLevelClass(job.total_score)]">
+                      {{ getScoreLevel(job.total_score) }}
+                    </span>
                   </div>
                   <div class="job-meta">
                     <span v-if="job.city" class="meta-item">
@@ -92,6 +128,13 @@
                       <el-icon><OfficeBuilding /></el-icon> {{ job.industry }}
                     </span>
                   </div>
+                  <el-progress
+                    :percentage="job.total_score"
+                    :stroke-width="4"
+                    :show-text="false"
+                    :color="getProgressColor(job.total_score)"
+                    class="job-score-bar"
+                  />
                 </div>
                 <el-button
                   :type="isJobLocked(job) ? 'primary' : 'default'"
@@ -126,7 +169,7 @@
               <el-icon><ChatDotRound /></el-icon>
               匹配简评
             </h3>
-            <p class="summary-text">{{ selectedJob.summary || '暂无简评' }}</p>
+            <p class="summary-text" v-html="highlightedSummary"></p>
           </div>
 
           <!-- 维度评分明细 -->
@@ -148,19 +191,45 @@
                     {{ dim.score }}<small>分</small>
                   </span>
                 </div>
-                <el-progress
-                  :percentage="dim.score"
-                  :stroke-width="8"
-                  :show-text="false"
-                  :color="getProgressColor(dim.score)"
-                  class="dim-progress"
-                />
-                <div v-if="dim.gap" class="dim-gap">
+                <div class="dim-dual-bar">
+                  <div class="bar-track">
+                    <div class="bar-fill bar-user" :style="{ width: `${dim.score}%`, background: getProgressColor(dim.score) }"></div>
+                  </div>
+                  <div v-if="dim.expected > 0" class="bar-track bar-expected-track">
+                    <div class="bar-fill bar-expected" :style="{ width: `${dim.expected}%` }"></div>
+                  </div>
+                </div>
+                <div class="bar-legend">
+                  <span class="legend-user"><i></i> 当前</span>
+                  <span v-if="dim.expected > 0" class="legend-expected"><i></i> 期望 {{ dim.expected }}</span>
+                </div>
+                <div v-if="dim.gap" :class="['dim-gap', getGapClass(dim.score, dim.expected)]">
                   <el-icon><Warning /></el-icon>
                   <span>{{ dim.gap }}</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- 岗位要求展开面板 -->
+          <div v-if="selectedJob.job_description || selectedJob.requirements" class="glass-card job-desc-card">
+            <h3 class="card-title" @click="descExpanded = !descExpanded" style="cursor: pointer;">
+              <el-icon><Document /></el-icon>
+              岗位要求
+              <el-icon class="expand-arrow" :class="{ expanded: descExpanded }"><ArrowDown /></el-icon>
+            </h3>
+            <el-collapse-transition>
+              <div v-show="descExpanded" class="desc-content">
+                <div v-if="selectedJob.job_description" class="desc-section">
+                  <h4>岗位描述</h4>
+                  <p>{{ selectedJob.job_description }}</p>
+                </div>
+                <div v-if="selectedJob.requirements" class="desc-section">
+                  <h4>任职要求</h4>
+                  <p>{{ selectedJob.requirements }}</p>
+                </div>
+              </div>
+            </el-collapse-transition>
           </div>
 
           <!-- 改进建议 -->
@@ -218,7 +287,8 @@ import { ElMessage } from 'element-plus'
 import {
   DataAnalysis, List, Location, Money,
   ChatDotRound, Histogram, Warning, Aim, Link,
-  Briefcase, OfficeBuilding, Lock, Unlock
+  Briefcase, OfficeBuilding, Lock, Unlock,
+  Document, ArrowDown
 } from '@element-plus/icons-vue'
 import { matchingApi } from '@/api/matching'
 import { currentRadarData, dimensionDetailsRaw, matchVersion } from './profileState.js'
@@ -270,11 +340,47 @@ const lockingKey = ref('')
 
 const dimensionList = computed(() => {
   const scores = selectedJob.value.scores || {}
-  return Object.entries(scores).map(([name, val]) => ({
-    name,
-    score: typeof val === 'object' ? val.score : val,
-    gap: typeof val === 'object' ? val.gap : '',
-  }))
+  return Object.entries(scores).map(([name, val]) => {
+    const score = typeof val === 'object' ? val.score : val
+    const gap = typeof val === 'object' ? val.gap : ''
+    return {
+      name,
+      score,
+      gap,
+      expected: parseExpectedScore(gap),
+    }
+  })
+})
+
+const parseExpectedScore = (gap) => {
+  if (!gap) return 0
+  const m = gap.match(/(\d+)/)
+  if (!m) return 0
+  const val = parseInt(m[1])
+  return val >= 10 && val <= 100 ? val : 0
+}
+
+const getGapClass = (score, expected) => {
+  if (!expected) return ''
+  if (score >= expected) return 'gap-good'
+  if (score >= expected - 10) return 'gap-close'
+  return 'gap-bad'
+}
+
+// ==================== AI 简评高亮 ====================
+const highlightedSummary = computed(() => {
+  const text = selectedJob.value.summary || '暂无简评'
+  const dimNames = ['专业技能', '证书资质', '创新能力', '学习能力', '抗压能力', '沟通能力', '实习', '项目经验']
+  const pattern = new RegExp(`(\\d+\\.?\\d*分|\\d+%|${dimNames.join('|')}|卓越|高度匹配|良好|不足|超出|需提升|建议)`, 'g')
+  return text.replace(pattern, '<mark>$1</mark>')
+})
+
+// ==================== 岗位描述展开 ====================
+const descExpanded = ref(false)
+
+watch(selectedIndex, () => {
+  descExpanded.value = false
+  nextTick(() => updateRadarChart())
 })
 
 // ==================== 匹配逻辑 ====================
@@ -598,10 +704,6 @@ onUnmounted(() => {
   clearInterval(progressTimer)
   radarInstance?.dispose()
   window.removeEventListener('resize', handleResize)
-})
-
-watch(selectedIndex, () => {
-  nextTick(() => updateRadarChart())
 })
 
 // Profile changed → auto re-match
@@ -1112,7 +1214,237 @@ watch(currentRadarData, (newVal, oldVal) => {
   }
 }
 
-/* 动画 */
+/* ========================================================== */
+/* Hero Stats */
+/* ========================================================== */
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px) saturate(1.1);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.07);
+    background: rgba(255, 255, 255, 0.55);
+  }
+
+  .stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(80,152,249,0.12) 0%, rgba(80,152,249,0.06) 100%);
+    color: #5098f9;
+    font-size: 20px;
+    flex-shrink: 0;
+
+    &.icon-score { background: linear-gradient(135deg, rgba(107,208,137,0.12) 0%, rgba(107,208,137,0.06) 100%); color: #6bd089; }
+    &.icon-industry { background: linear-gradient(135deg, rgba(232,158,90,0.12) 0%, rgba(232,158,90,0.06) 100%); color: #e89e5a; }
+    &.icon-level { background: linear-gradient(135deg, rgba(148,95,185,0.12) 0%, rgba(148,95,185,0.06) 100%); color: #945fb9; }
+  }
+
+  .stat-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-num {
+    font-size: 24px;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1.2;
+
+    &.text-sm { font-size: 15px; }
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+}
+
+/* ========================================================== */
+/* Enhanced Job List Item */
+/* ========================================================== */
+@keyframes itemSlideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.match-level-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: auto;
+
+  &.badge-success { background: rgba(107,208,137,0.12); color: #6bd089; }
+  &.badge-warning { background: rgba(232,158,90,0.12); color: #e89e5a; }
+  &.badge-danger { background: rgba(244,76,76,0.12); color: #f44c4c; }
+}
+
+.job-score-bar {
+  margin-top: 6px;
+  :deep(.el-progress-bar__outer) { background-color: rgba(60,78,104,0.04); }
+  :deep(.el-progress-bar__inner) { border-radius: 10px; }
+}
+
+.job-item {
+  animation: itemSlideIn 0.35s cubic-bezier(0.23, 1, 0.32, 1) both;
+
+  &.selected {
+    position: relative;
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      background: linear-gradient(180deg, #5098f9, #667eea);
+      border-radius: 3px;
+    }
+  }
+}
+
+/* ========================================================== */
+/* Job Description Card */
+/* ========================================================== */
+.job-desc-card {
+  .expand-arrow {
+    margin-left: auto;
+    font-size: 14px;
+    color: #94a3b8;
+    transition: transform 0.3s ease;
+    &.expanded { transform: rotate(180deg); }
+  }
+
+  .desc-content {
+    padding-top: 8px;
+  }
+
+  .desc-section {
+    margin-bottom: 16px;
+    &:last-child { margin-bottom: 0; }
+
+    h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #5098f9;
+      margin: 0 0 8px;
+      padding-left: 10px;
+      border-left: 3px solid;
+      border-image: linear-gradient(180deg, #5098f9, #667eea) 1;
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      color: #3c4e68;
+      line-height: 1.9;
+      white-space: pre-wrap;
+      background: rgba(255, 255, 255, 0.3);
+      padding: 12px 16px;
+      border-radius: 10px;
+    }
+  }
+}
+
+/* ========================================================== */
+/* Enhanced Dimension Dual Bar */
+/* ========================================================== */
+.dim-dual-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.bar-track {
+  height: 6px;
+  background: rgba(60, 78, 104, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+
+  &.bar-expected {
+    background: rgba(80, 152, 249, 0.2);
+    border: 1px dashed rgba(80, 152, 249, 0.35);
+  }
+}
+
+.bar-legend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  color: #94a3b8;
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    i {
+      display: inline-block;
+      width: 14px;
+      height: 3px;
+      border-radius: 2px;
+    }
+  }
+
+  .legend-user i { background: #5098f9; }
+  .legend-expected i { background: rgba(80,152,249,0.2); border: 1px dashed rgba(80,152,249,0.35); }
+}
+
+.dim-gap {
+  &.gap-good { color: #6bd089; .el-icon { color: #6bd089; } }
+  &.gap-close { color: #5098f9; .el-icon { color: #5098f9; } }
+  &.gap-bad { color: #e89e5a; .el-icon { color: #e89e5a; } }
+}
+
+/* ========================================================== */
+/* Enhanced Summary */
+/* ========================================================== */
+.summary-card .summary-text :deep(mark) {
+  background: linear-gradient(135deg, rgba(80,152,249,0.12) 0%, rgba(140,151,246,0.12) 100%);
+  color: #5098f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.summary-card .summary-text {
+  border-image: linear-gradient(180deg, #e89e5a, #fcd37e) 1;
+}
+
+/* ========================================================== */
+/* Animations */
+/* ========================================================== */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1122,19 +1454,21 @@ watch(currentRadarData, (newVal, oldVal) => {
   to { transform: rotate(360deg); }
 }
 
-/* 响应式 */
+/* ========================================================== */
+/* Responsive */
+/* ========================================================== */
 @media (max-width: 900px) {
+  .hero-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .overview-row {
     flex-direction: column;
-
-    .radar-card {
-      flex: none;
-    }
+    .radar-card { flex: none; }
   }
 
   .dimensions-card .dimensions-grid {
     grid-template-columns: 1fr;
   }
-
 }
 </style>

@@ -79,7 +79,7 @@ async def retrieve_candidates(state: JobMatcherState) -> Dict:
         title = (job.get("job_title") or "").strip()
         if title and title not in seen_titles:
             seen_titles[title] = str(job["id"])
-        if len(seen_titles) >= 10:
+        if len(seen_titles) >= 15:
             break
 
     print(f"[Match] After dedup: {len(seen_titles)} unique titles: {list(seen_titles.keys())}")
@@ -180,6 +180,8 @@ async def algorithmic_match(state: JobMatcherState) -> Dict:
             "industry": job.get("industry", ""),
             "city": job.get("city", ""),
             "salary_range": job.get("salary_range", ""),
+            "job_description": job.get("job_description", ""),
+            "requirements": job.get("requirements", ""),
             **score_result,
         })
 
@@ -197,7 +199,7 @@ async def save_report(state: JobMatcherState) -> Dict:
     uid = state["user_id"]
     ranked = state.get("ranked_results", [])
 
-    for r in ranked[:5]:  # Top 5
+    for r in ranked[:15]:  # Top 15
         await db_utils.save_match_report(
             user_id=uid,
             job_name=r.get("job_title", ""),

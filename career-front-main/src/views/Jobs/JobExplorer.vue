@@ -56,7 +56,15 @@
             <div class="card-main">
               <div class="title-row">
                 <span class="job-name">{{ job.title }}</span>
-                <span class="job-salary-pill">{{ job.salary }}</span>
+                <div class="title-right">
+                  <span class="job-salary-pill">{{ job.salary }}</span>
+                  <span
+                    :class="['fav-btn', { 'is-fav': favoritedIds.has(job.id) }]"
+                    @click="toggleFavorite($event, job)"
+                  >
+                    <el-icon><StarFilled v-if="favoritedIds.has(job.id)" /><Star v-else /></el-icon>
+                  </span>
+                </div>
               </div>
               <div class="company-row">
                 <span class="comp-logo">{{ job.company.charAt(0) }}</span>
@@ -153,8 +161,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, ArrowDown, Pointer, Loading, Location } from '@element-plus/icons-vue'
+import { Search, ArrowDown, Pointer, Loading, Location, Star, StarFilled } from '@element-plus/icons-vue'
 import { jobsApi } from '@/api/jobs'
+import { favoritesApi } from '@/api/favorites'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const searchQuery = ref('')
@@ -163,6 +173,7 @@ const dialogVisible = ref(false)
 const selectedOptions = ref([])
 const selectedTags = ref([])
 const hoveredJob = ref(null)
+const favoritedIds = ref(new Set())
 const allJobs = ref([])
 const currentPage = ref(1)
 let searchTimer = null
@@ -208,8 +219,38 @@ const loadJobs = async (reset = true) => {
   }
 }
 
+const loadFavorites = async () => {
+  try {
+    const { data } = await favoritesApi.list()
+    favoritedIds.value = new Set((data.favorites || []).map(f => f.job_id))
+  } catch { /* ignore */ }
+}
+
+const toggleFavorite = async (e, job) => {
+  e.stopPropagation()
+  const id = job.id
+  try {
+    if (favoritedIds.value.has(id)) {
+      await favoritesApi.remove(id)
+      const next = new Set(favoritedIds.value)
+      next.delete(id)
+      favoritedIds.value = next
+      ElMessage.success('已取消收藏')
+    } else {
+      await favoritesApi.add(id)
+      const next = new Set(favoritedIds.value)
+      next.add(id)
+      favoritedIds.value = next
+      ElMessage.success('已添加收藏')
+    }
+  } catch {
+    ElMessage.error('操作失败')
+  }
+}
+
 onMounted(() => {
   loadJobs()
+  loadFavorites()
 })
 
 // --- Infinite scroll ---
@@ -838,6 +879,12 @@ const filterOptions = {
       letter-spacing: 0.3px;
     }
 
+    .title-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     /* 薪资胶囊 */
     .job-salary-pill {
       font-size: 13px;
@@ -849,6 +896,35 @@ const filterOptions = {
       border-radius: 20px;
       border: 1px solid rgba(247, 124, 56, 0.12);
       white-space: nowrap;
+    }
+
+    /* 收藏按钮 */
+    .fav-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: #c9cdd4;
+      flex-shrink: 0;
+
+      &:hover {
+        color: #ffd700;
+        transform: scale(1.15) rotate(12deg);
+        background: rgba(255, 215, 0, 0.08);
+      }
+
+      &.is-fav {
+        color: #ffd700;
+        filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.4));
+      }
+
+      .el-icon {
+        font-size: 16px;
+      }
     }
   }
 
